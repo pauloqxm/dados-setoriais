@@ -154,7 +154,7 @@ def salvar_em_planilha(dados_formulario: dict) -> bool:
 
 
 # ============ Configurações iniciais ============
-st.set_page_config(page_title="Atualização de Contatos — Filiados", page_icon="🗂️", layout="centered")
+st.set_page_config(page_title="PT - Atualização de Dados", page_icon="🔴", layout="centered")
 
 # ======== Tema (vermelho) + estilos ========
 st.markdown(
