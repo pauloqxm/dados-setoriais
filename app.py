@@ -67,27 +67,93 @@ def get_gspread_client():
 # ============ Configurações iniciais ============
 st.set_page_config(page_title="Atualização de Contatos — Filiados", page_icon="🗂️", layout="centered")
 
+# ======== Tema (vermelho) + estilos ========
 st.markdown(
     """
     <style>
-    .small { font-size: 0.9rem; color: #4b5563; }
+    :root {
+        --pt-red: #C00000;
+        --pt-red-dark: #8F0000;
+        --pt-red-soft: #FDE8E8;
+        --text: #1F2937;
+        --muted: #6B7280;
+        --card: #ffffff;
+        --border: #f1f1f1;
+    }
+    .app-topbar {
+        border-radius: 12px;
+        overflow: hidden;
+        box-shadow: 0 8px 24px rgba(0,0,0,.08);
+        border: 1px solid var(--border);
+    }
+    .desc {
+        margin-top: .5rem;
+        font-weight: 600;
+        color: var(--pt-red-dark);
+        background: linear-gradient(180deg, #fff, #fff 55%, #fff0 100%);
+        text-align: center;
+        padding: 8px 10px;
+    }
+    .small { font-size: 0.9rem; color: var(--muted); }
     .ok { color: #065f46; }
     .warn { color: #92400e; }
     .err { color: #991b1b; }
+
     .card {
         border-radius: 14px;
         padding: 14px 16px;
-        box-shadow: 0 4px 14px rgba(0,0,0,.08);
-        background: #fff;
-        border: 1px solid #eef2f7;
+        box-shadow: 0 6px 16px rgba(0,0,0,.06);
+        background: var(--card);
+        border: 1px solid var(--border);
     }
+
+    /* Botão principal */
+    div.stButton > button {
+        background: linear-gradient(135deg, var(--pt-red), var(--pt-red-dark));
+        color: #fff;
+        border: none;
+        border-radius: 12px;
+        padding: 10px 16px;
+        font-weight: 700;
+        box-shadow: 0 4px 12px rgba(192,0,0,.25);
+    }
+    div.stButton > button:hover {
+        filter: brightness(1.05);
+        transform: translateY(-1px);
+    }
+
+    /* Inputs */
+    .stTextInput input, .stSelectbox, .stDateInput input {
+        border-radius: 10px !important;
+        border-color: #f0d3d3 !important;
+    }
+    .stTextInput input:focus, .stDateInput input:focus {
+        outline: 2px solid var(--pt-red) !important;
+        border-color: var(--pt-red) !important;
+    }
+
+    /* Divider color trick */
+    hr { border-color: #f5caca !important; }
     </style>
     """,
     unsafe_allow_html=True,
 )
 
+# ======= Barra superior (imagem) + descrição =======
+with st.container():
+    st.markdown('<div class="app-topbar">', unsafe_allow_html=True)
+    st.image(
+        "https://pt.org.br/wp-content/uploads/2025/09/whatsapp-image-2025-09-09-at-162545.jpeg",
+        use_column_width=True,
+    )
+    st.markdown(
+        '<div class="desc">Atualize os seus dados cadastrais e participe das instâncias internas do PT</div>',
+        unsafe_allow_html=True,
+    )
+    st.markdown('</div>', unsafe_allow_html=True)
+
 st.title("🗂️ Atualização de Contatos de Filiados")
-st.caption("Consulte pelo **aniversário** e, se necessário, envie correções de contato para a planilha oficial.")
+st.caption("Consulte pelo aniversário e, se necessário, envie correções de contato para a planilha oficial.")
 
 # ============ Entrada de dados base ============
 @st.cache_data(show_spinner=False)
@@ -118,7 +184,7 @@ csv_source = None
 for candidate in CSV_CANDIDATES:
     if os.path.exists(candidate):
         csv_source = candidate
-        # (Mensagem removida a pedido)
+        # (Mensagem de "Arquivo base encontrado" removida a pedido)
         break
 
 if not csv_source:
@@ -132,7 +198,7 @@ if not csv_source:
 with st.spinner("Carregando a base..."):
     df = load_csv(csv_source)
 
-# Possíveis nomes de campos
+# ======== Colunas esperadas + utilitários ========
 CANDS_DN = ["data_de_nascimento","data_nascimento","data_nasc","nascimento","dt_nasc","dt_nascimento"]
 CANDS_NOME = ["nome_do_filiado","nome","nome_completo"]
 CANDS_EMAIL = ["e-mail","email","e_mail"]
@@ -176,6 +242,18 @@ def to_date_safe(v):
     except Exception:
         return None
 
+# Formatação do telefone: remove ".0" e não dígitos; coloca DDD entre parênteses
+def only_digits(s: str) -> str:
+    return re.sub(r"\D+", "", s or "")
+
+def format_phone_br(s: str) -> str:
+    digits = only_digits(str(s))
+    if len(digits) < 3:  # sem DDD não formatar
+        return digits
+    ddd = digits[:2]
+    resto = digits[2:]
+    return f"({ddd}) {resto}"
+
 df["_dn_date"] = df[col_dn].apply(to_date_safe)
 
 # ============ Formulário de consulta ============
@@ -205,10 +283,14 @@ escolha = st.selectbox("Selecione o filiado (se houver homônimos na mesma data)
 selecionado = matches[matches[col_nome] == escolha].iloc[0]
 
 st.markdown("### 📄 Dados do cadastro")
-with st.container(border=True):
+with st.container():
+    st.markdown('<div class="card">', unsafe_allow_html=True)
     st.write("**Nome do filiado:**", selecionado.get(col_nome, ""))
     st.write("**E-mail:**", selecionado.get(col_email, ""))
-    st.write("**Celular/WhatsApp:**", selecionado.get(col_whats, ""))
+    # Aplica a formatação no display do telefone/WhatsApp
+    raw_phone = selecionado.get(col_whats, "")
+    st.write("**Celular/WhatsApp:**", format_phone_br(str(raw_phone)))
+    st.markdown('</div>', unsafe_allow_html=True)
 
 st.divider()
 
@@ -237,7 +319,7 @@ setorial = st.selectbox("Selecione um setorial", ["Cultura", "Agrário"])
 # ============ Envio para Google Sheets ============
 st.divider()
 st.markdown("### 📤 Enviar atualização")
-st.caption("As respostas serão **anexadas** à planilha indicada, com cabeçalho na primeira linha se ainda não existir.")
+st.caption("As respostas serão anexadas à planilha indicada, com cabeçalho na primeira linha se ainda não existir.")
 
 # URL pré-configurada (pode ser alterada dentro de um expander avançado)
 SHEET_URL_DEFAULT = "https://docs.google.com/spreadsheets/d/1tWyQQow2jhP50hSLSc00CvzfWVubpcd48MUeVvWTa_s/edit?gid=0"
@@ -306,14 +388,17 @@ def gsheet_append_row(payload: dict, sheet_url: str) -> bool:
 with st.form("envio_form"):
     submitted = st.form_submit_button("Enviar atualização")
     if submitted:
+        # Se o usuário digitou novo telefone, opcionalmente salvar somente os dígitos:
+        novo_fone_digits = only_digits(novo_fone) if novo_fone else ""
+
         payload = {
             "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
             "data_nascimento": dob.strftime("%d/%m/%Y"),
             "nome_do_filiado": selecionado.get(col_nome, ""),
             "email_atual": selecionado.get(col_email, ""),
-            "celular_whatsapp_atual": selecionado.get(col_whats, ""),
+            "celular_whatsapp_atual": str(selecionado.get(col_whats, "")),
             "corrigir_telefone_whatsapp": "Sim" if opt_fone else "Não",
-            "novo_celular_whatsapp": (novo_fone or ""),
+            "novo_celular_whatsapp": novo_fone_digits,
             "corrigir_email": "Sim" if opt_mail else "Não",
             "novo_email": (novo_mail or ""),
             "setorial": setorial,
