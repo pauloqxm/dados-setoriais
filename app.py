@@ -388,20 +388,16 @@ with st.spinner("Carregando a base..."):
     df = load_csv(csv_source)
 
 # ======== Colunas esperadas + utilitários ========
-CANDS_DN = ["data_de_nascimento", "data_nascimento", "data_nasc", "nascimento", "dt_nasc", "dt_nascimento"]
-CANDS_NOME = ["nome_do_filiado", "nome", "nome_completo"]
-CANDS_EMAIL = ["e-mail", "email", "e_mail"]
-CANDS_WHATS = ["celular_whatsapp", "celular", "telefone", "telefone_whatsapp", "whatsapp"]
-# agora incluindo possíveis variações no plural e com acento
-CANDS_MUNICIPIO = ["municipio", "município", "municipios", "municípios", "municipio_de_residencia", "cidade", "localidade", "cidade_residencia"]
-CANDS_CPF = ["cpf"]
+CANDS_DN = ["data_de_nascimento","data_nascimento","data_nasc","nascimento","dt_nasc","dt_nascimento"]
+CANDS_NOME = ["nome_do_filiado","nome","nome_completo"]
+CANDS_EMAIL = ["e-mail","email","e_mail"]
+CANDS_WHATS = ["celular_whatsapp","celular","telefone","telefone_whatsapp","whatsapp"]
+CANDS_MUNICIPIO = ["municipio", "município", "municipio_de_residencia", "cidade"]
 
 def first_col(df, options: List[str]) -> Optional[str]:
-    for c in df.columns:
-        norm_c = c.lower().strip()
-        for opt in options:
-            if norm_c == opt.lower():
-                return c
+    for c in options:
+        if c in df.columns:
+            return c
     return None
 
 col_dn = first_col(df, CANDS_DN)
@@ -409,81 +405,55 @@ col_nome = first_col(df, CANDS_NOME)
 col_email = first_col(df, CANDS_EMAIL)
 col_whats = first_col(df, CANDS_WHATS)
 col_municipio = first_col(df, CANDS_MUNICIPIO)
-col_cpf = first_col(df, CANDS_CPF)
 
-missing = [
-    ("Data de Nascimento", col_dn),
-    ("Nome", col_nome),
-    ("E-mail", col_email),
-    ("Celular/WhatsApp", col_whats),
-    ("Município", col_municipio),
-    ("CPF", col_cpf),
-]
+missing = [("Data de Nascimento", col_dn), ("Nome", col_nome), ("E-mail", col_email), ("Celular/WhatsApp", col_whats)]
 missing_cols = [label for label, val in missing if val is None]
 if missing_cols:
     st.error(
         "As seguintes colunas não foram encontradas automaticamente na planilha: "
         + ", ".join([f"**{m}**" for m in missing_cols])
-        + ".\n\nVerifique os cabeçalhos do CSV ou ajuste as listas CANDS_* acima."
+        + ".\n\n"
+        "Renomeie as colunas ou ajuste os nomes candidatos no código."
     )
     st.stop()
 
 # ============ FILTRO DE MUNICÍPIO ============
 st.markdown('<div class="section-title">🏙️ Filtro por Município</div>', unsafe_allow_html=True)
 
-def _norm_txt(x: str) -> str:
-    import unicodedata, re
-    if x is None:
-        return ""
-    s = str(x).strip()
-    s = ''.join(c for c in unicodedata.normalize('NFKD', s) if not unicodedata.combining(c))  # tira acentos
-    s = s.lower()
-    s = re.sub(r'\s+', ' ', s)
-    return s
-
-if col_municipio:
-    st.success(f"✅ Coluna de município detectada: **{col_municipio}**")
-
-    serie_mun = df[col_municipio].astype(str).map(lambda v: v.strip()).replace({"nan": ""})
-
-    norm_to_original = {}
-    for val in serie_mun:
-        if not val:
-            continue
-        key = _norm_txt(val)
-        if key and key not in norm_to_original:
-            norm_to_original[key] = val
-
-    opcoes_originais = sorted(norm_to_original.values(), key=lambda s: s.casefold())
-    opcoes_select = ["Todos os municípios"] + opcoes_originais
-
-    municipio_escolhido_display = st.selectbox(
-        "Selecione o município para filtrar a pesquisa:",
-        options=opcoes_select,
-        index=0
-    )
-
-    if municipio_escolhido_display == "Todos os municípios":
-        df_filtrado = df.copy()
-        municipio_selecionado = "Todos os municípios"
-    else:
-        alvo_norm = _norm_txt(municipio_escolhido_display)
-        mask = serie_mun.map(_norm_txt).eq(alvo_norm)
-        df_filtrado = df[mask].copy()
-        municipio_selecionado = municipio_escolhido_display
-
-    st.info(f"**Município selecionado:** {municipio_selecionado} | **Registros encontrados:** {len(df_filtrado)}")
-else:
-    st.warning("⚠️ Nenhuma coluna de município foi encontrada na base. Mostrando todos os registros.")
+# Verifica se a coluna de município existe
+if col_municipio is None:
+    st.warning("Coluna de município não encontrada na base de dados. Mostrando todos os registros.")
     df_filtrado = df.copy()
     municipio_selecionado = "Todos os municípios"
+else:
+    # Obtém lista de municípios únicos e ordena
+    municipios = df[col_municipio].dropna().unique()
+    municipios = sorted([m for m in municipios if str(m).strip() != ""])
+    
+    if len(municipios) == 0:
+        st.warning("Nenhum município encontrado na base de dados.")
+        df_filtrado = df.copy()
+        municipio_selecionado = "Nenhum município encontrado"
+    else:
+        # Adiciona opção "Todos os municípios"
+        municipios_com_todos = ["Todos os municípios"] + municipios
+        
+        municipio_selecionado = st.selectbox(
+            "Selecione o município para filtrar a pesquisa:",
+            options=municipios_com_todos,
+            index=0  # Seleciona "Todos os municípios" por padrão
+        )
+        
+        # Aplica filtro se não for "Todos os municípios"
+        if municipio_selecionado == "Todos os municípios":
+            df_filtrado = df.copy()
+        else:
+            df_filtrado = df[df[col_municipio] == municipio_selecionado].copy()
+            
+        st.info(f"**Município selecionado:** {municipio_selecionado} | **Registros encontrados:** {len(df_filtrado)}")
 
 st.title("📝 Atualização de Dados")
 st.caption(f"Consulte pelo aniversário ou nome | Município: {municipio_selecionado}")
-
-
-
-# ... (o resto do código continua igual a partir daqui)
 
 # Normaliza datas da coluna DN para tipo date
 def to_date_safe(v):
