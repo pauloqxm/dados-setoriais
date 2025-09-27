@@ -602,7 +602,7 @@ if opt_mail:
 
 # ============ Setorial ============
 st.markdown('<div class="section-title">🏷️ Setorial</div>', unsafe_allow_html=True)
-setorial = st.selectbox("Selecione um setorial", ["Cultura", "Agrário"])
+setorial = st.selectbox("Selecione um setorial", ["Selecione", "Cultura", "Agrário", "Outro"])
 
 # ============ Envio para Google Sheets ============
 st.divider()
