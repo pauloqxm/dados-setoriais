@@ -345,9 +345,6 @@ with st.container():
     
     st.markdown('</div>', unsafe_allow_html=True)
 
-st.title("📝 Atualização de Dados")
-st.caption("Consulte pelo aniversário e, se não encontrar, pesquise pelo nome.")
-
 # ============ Entrada de dados base ============
 @st.cache_data(show_spinner=False)
 def load_csv(path_or_buffer) -> pd.DataFrame:
@@ -395,6 +392,7 @@ CANDS_DN = ["data_de_nascimento","data_nascimento","data_nasc","nascimento","dt_
 CANDS_NOME = ["nome_do_filiado","nome","nome_completo"]
 CANDS_EMAIL = ["e-mail","email","e_mail"]
 CANDS_WHATS = ["celular_whatsapp","celular","telefone","telefone_whatsapp","whatsapp"]
+CANDS_MUNICIPIO = ["municipio", "município", "municipio_de_residencia", "cidade"]
 
 def first_col(df, options: List[str]) -> Optional[str]:
     for c in options:
@@ -406,6 +404,7 @@ col_dn = first_col(df, CANDS_DN)
 col_nome = first_col(df, CANDS_NOME)
 col_email = first_col(df, CANDS_EMAIL)
 col_whats = first_col(df, CANDS_WHATS)
+col_municipio = first_col(df, CANDS_MUNICIPIO)
 
 missing = [("Data de Nascimento", col_dn), ("Nome", col_nome), ("E-mail", col_email), ("Celular/WhatsApp", col_whats)]
 missing_cols = [label for label, val in missing if val is None]
@@ -417,6 +416,44 @@ if missing_cols:
         "Renomeie as colunas ou ajuste os nomes candidatos no código."
     )
     st.stop()
+
+# ============ FILTRO DE MUNICÍPIO ============
+st.markdown('<div class="section-title">🏙️ Filtro por Município</div>', unsafe_allow_html=True)
+
+# Verifica se a coluna de município existe
+if col_municipio is None:
+    st.warning("Coluna de município não encontrada na base de dados. Mostrando todos os registros.")
+    df_filtrado = df.copy()
+    municipio_selecionado = "Todos os municípios"
+else:
+    # Obtém lista de municípios únicos e ordena
+    municipios = df[col_municipio].dropna().unique()
+    municipios = sorted([m for m in municipios if str(m).strip() != ""])
+    
+    if len(municipios) == 0:
+        st.warning("Nenhum município encontrado na base de dados.")
+        df_filtrado = df.copy()
+        municipio_selecionado = "Nenhum município encontrado"
+    else:
+        # Adiciona opção "Todos os municípios"
+        municipios_com_todos = ["Todos os municípios"] + municipios
+        
+        municipio_selecionado = st.selectbox(
+            "Selecione o município para filtrar a pesquisa:",
+            options=municipios_com_todos,
+            index=0  # Seleciona "Todos os municípios" por padrão
+        )
+        
+        # Aplica filtro se não for "Todos os municípios"
+        if municipio_selecionado == "Todos os municípios":
+            df_filtrado = df.copy()
+        else:
+            df_filtrado = df[df[col_municipio] == municipio_selecionado].copy()
+            
+        st.info(f"**Município selecionado:** {municipio_selecionado} | **Registros encontrados:** {len(df_filtrado)}")
+
+st.title("📝 Atualização de Dados")
+st.caption(f"Consulte pelo aniversário ou nome | Município: {municipio_selecionado}")
 
 # Normaliza datas da coluna DN para tipo date
 def to_date_safe(v):
@@ -452,7 +489,7 @@ def format_phone_br(s: str) -> str:
         resto = f"{resto[:5]}-{resto[5:]}"
     return f"({ddd}) {resto}"
 
-df["_dn_date"] = df[col_dn].apply(to_date_safe)
+df_filtrado["_dn_date"] = df_filtrado[col_dn].apply(to_date_safe)
 
 # ============ Formulário de consulta ============
 st.markdown('<div class="section-title">🔎 Consulta</div>', unsafe_allow_html=True)
@@ -478,8 +515,8 @@ if tipo_consulta == "Consulta por data de nascimento":
     )
     
     if dob is not None:
-        # Busca registros desta data
-        matches = df[df["_dn_date"] == dob].copy()
+        # Busca registros desta data na base filtrada
+        matches = df_filtrado[df_filtrado["_dn_date"] == dob].copy()
 
 else:  # Consulta por nome
     nome_busca = st.text_input(
@@ -488,10 +525,10 @@ else:  # Consulta por nome
     )
     
     if nome_busca and len(nome_busca.strip()) >= 2:
-        # Busca por parte do nome (case insensitive)
+        # Busca por parte do nome (case insensitive) na base filtrada
         nome_busca_clean = nome_busca.strip().lower()
-        mask = df[col_nome].str.lower().str.contains(nome_busca_clean, na=False)
-        matches = df[mask].copy()
+        mask = df_filtrado[col_nome].str.lower().str.contains(nome_busca_clean, na=False)
+        matches = df_filtrado[mask].copy()
         
         if len(matches) > 100:
             st.warning(f"Foram encontrados {len(matches)} registros. Digite mais letras para refinar a busca.")
@@ -516,14 +553,22 @@ if len(matches) > 1:
     for _, row in matches.iterrows():
         nome = row.get(col_nome, '(sem nome)')
         data_nasc = row.get('_dn_date', '')
+        municipio = row.get(col_municipio, '') if col_municipio else ''
+        
+        info_extra = []
         if data_nasc:
-            opcoes.append(f"{nome} ({data_nasc.strftime('%d/%m/%Y')})")
+            info_extra.append(data_nasc.strftime('%d/%m/%Y'))
+        if municipio and municipio_selecionado == "Todos os municípios":
+            info_extra.append(municipio)
+        
+        if info_extra:
+            opcoes.append(f"{nome} ({', '.join(info_extra)})")
         else:
-            opcoes.append(f"{nome} (data não informada)")
+            opcoes.append(f"{nome}")
     
     escolha = st.selectbox("Selecione o filiado:", options=opcoes)
     
-    # Extrai o nome da escolha (remove a data entre parênteses)
+    # Extrai o nome da escolha (remove as informações extras entre parênteses)
     nome_escolhido = escolha.split(' (')[0]
     selecionado = matches[matches[col_nome] == nome_escolhido].iloc[0]
 else:
@@ -543,6 +588,7 @@ nome_formatado = formatar_valor(selecionado.get(col_nome, ""))
 email_formatado = formatar_valor(selecionado.get(col_email, ""))
 telefone_raw = selecionado.get(col_whats, "")
 telefone_formatado = formatar_valor(telefone_raw)
+municipio_formatado = formatar_valor(selecionado.get(col_municipio, "")) if col_municipio else ""
 
 # Se não for "Sem informação", formata o telefone
 if telefone_formatado != "Sem informação (atualize)":
@@ -556,6 +602,17 @@ else:
     data_nascimento_formatada = "Sem informação"
 
 # Criando um faux selectbox para exibir os dados
+info_lines = [
+    f"<strong>Nome:</strong> {nome_formatado}",
+    f"<strong>Data de Nascimento:</strong> {data_nascimento_formatada}",
+    f"<strong>E-mail:</strong> {email_formatado}",
+    f"<strong>Celular/WhatsApp:</strong> {telefone_formatado}"
+]
+
+# Adiciona município apenas se a coluna existir e não estiver filtrado por município específico
+if col_municipio and municipio_selecionado == "Todos os municípios":
+    info_lines.append(f"<strong>Município:</strong> {municipio_formatado}")
+
 st.markdown(
     f"""
     <div style="
@@ -570,10 +627,7 @@ st.markdown(
     ">
     <div style="font-weight: 600; color: #6B7280; font-size: 0.9rem; margin-bottom: 8px;">Dados do cadastro atual</div>
     <div style="line-height: 1.5;">
-        <strong>Nome:</strong> {nome_formatado}<br>
-        <strong>Data de Nascimento:</strong> {data_nascimento_formatada}<br>
-        <strong>E-mail:</strong> {email_formatado}<br>
-        <strong>Celular/WhatsApp:</strong> {telefone_formatado}
+        {"<br>".join(info_lines)}
     </div>
     </div>
     """, 
