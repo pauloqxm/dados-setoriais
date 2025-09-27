@@ -392,7 +392,7 @@ CANDS_DN = ["data_de_nascimento","data_nascimento","data_nasc","nascimento","dt_
 CANDS_NOME = ["nome_do_filiado","nome","nome_completo"]
 CANDS_EMAIL = ["e-mail","email","e_mail"]
 CANDS_WHATS = ["celular_whatsapp","celular","telefone","telefone_whatsapp","whatsapp"]
-CANDS_MUNICIPIO = ["municipio", "municipio", "municipio_de_residencia", "cidade", "município"]
+CANDS_MUNICIPIO = ["municipio", "municipio_de_residencia", "cidade"]  # Removi duplicatas
 
 def first_col(df, options: List[str]) -> Optional[str]:
     for c in options:
@@ -406,24 +406,7 @@ col_email = first_col(df, CANDS_EMAIL)
 col_whats = first_col(df, CANDS_WHATS)
 col_municipio = first_col(df, CANDS_MUNICIPIO)
 
-# DEBUG: Mostrar colunas disponíveis para confirmar
-st.write("🔍 **Colunas disponíveis na base de dados:**")
-st.write(list(df.columns))
-
-# Verifica se encontrou a coluna de município
-if col_municipio is None:
-    # Busca direta pela coluna original
-    if "município" in df.columns:
-        col_municipio = "município"
-    elif "municipio" in df.columns:
-        col_municipio = "municipio"
-    else:
-        # Tenta encontrar por similaridade
-        for col in df.columns:
-            if 'munic' in col.lower():
-                col_municipio = col
-                break
-
+# Verificação das colunas essenciais
 missing = [("Data de Nascimento", col_dn), ("Nome", col_nome), ("E-mail", col_email), ("Celular/WhatsApp", col_whats)]
 missing_cols = [label for label, val in missing if val is None]
 if missing_cols:
