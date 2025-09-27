@@ -350,10 +350,6 @@ with st.container():
 def load_csv(path_or_buffer) -> pd.DataFrame:
     # Tenta detectar separador automaticamente
     df = pd.read_csv(path_or_buffer, sep=None, engine="python")
-    
-    # Salva os nomes originais das colunas antes da normalização
-    colunas_originais = df.columns.tolist()
-    
     # Normaliza nomes de colunas (sem acentos/caixa e troca espaços por sublinhado)
     def norm(s: str) -> str:
         import unicodedata, re
@@ -361,25 +357,42 @@ def load_csv(path_or_buffer) -> pd.DataFrame:
         s2 = s2.lower()
         s2 = re.sub(r'\s+', '_', s2.strip())
         return s2
-    
     df.columns = [norm(c) for c in df.columns]
-    
-    # Mapeamento para encontrar colunas específicas
-    colunas_map = {}
-    for original, normalizada in zip(colunas_originais, df.columns):
-        colunas_map[normalizada] = original
-    
-    # Preserva o mapeamento no dataframe
-    df.attrs['colunas_originais'] = colunas_map
-    
     return df
+
+# Aceita múltiplos nomes/variações do arquivo
+CSV_CANDIDATES = [
+    "FILIADOSDADOS.CSV",
+    "FILIADOSDADOS.csv",
+    "FILADOSDADOS.CSV",
+    "FILADOSDADOS.csv",
+    "filiaDOSdados.csv",
+    "filiaDOSdados.CSV",
+]
+
+csv_source = None
+for candidate in CSV_CANDIDATES:
+    if os.path.exists(candidate):
+        csv_source = candidate
+        break
+
+if not csv_source:
+    up = st.file_uploader("Envie a planilha .csv (separadores automáticos).", type=["csv"])
+    if up:
+        csv_source = io.BytesIO(up.read())
+
+if not csv_source:
+    st.stop()
+
+with st.spinner("Carregando a base..."):
+    df = load_csv(csv_source)
 
 # ======== Colunas esperadas + utilitários ========
 CANDS_DN = ["data_de_nascimento","data_nascimento","data_nasc","nascimento","dt_nasc","dt_nascimento"]
 CANDS_NOME = ["nome_do_filiado","nome","nome_completo"]
 CANDS_EMAIL = ["e-mail","email","e_mail"]
 CANDS_WHATS = ["celular_whatsapp","celular","telefone","telefone_whatsapp","whatsapp"]
-CANDS_MUNICIPIO = ["municipio", "municipio", "municipio_de_residencia", "cidade"]
+CANDS_MUNICIPIO = ["municipio", "municipio_de_residencia", "cidade"]
 
 def first_col(df, options: List[str]) -> Optional[str]:
     for c in options:
@@ -387,16 +400,12 @@ def first_col(df, options: List[str]) -> Optional[str]:
             return c
     return None
 
+# AGORA o df já está definido, então podemos usar aqui
 col_dn = first_col(df, CANDS_DN)
 col_nome = first_col(df, CANDS_NOME)
 col_email = first_col(df, CANDS_EMAIL)
 col_whats = first_col(df, CANDS_WHATS)
 col_municipio = first_col(df, CANDS_MUNICIPIO)
-
-# DEBUG: Mostrar o mapeamento de colunas
-if hasattr(df, 'attrs') and 'colunas_originais' in df.attrs:
-    st.write("🔍 **Mapeamento de colunas:**")
-    st.write(df.attrs['colunas_originais'])
 
 # Verificação das colunas essenciais
 missing = [("Data de Nascimento", col_dn), ("Nome", col_nome), ("E-mail", col_email), ("Celular/WhatsApp", col_whats)]
@@ -414,9 +423,7 @@ if missing_cols:
 st.markdown('<div class="section-title">🏙️ Filtro por Município</div>', unsafe_allow_html=True)
 
 if col_municipio:
-    # Recupera o nome original da coluna para exibição
-    nome_original_municipio = df.attrs.get('colunas_originais', {}).get(col_municipio, col_municipio)
-    st.success(f"✅ Coluna de município detectada: **{nome_original_municipio}**")
+    st.success(f"✅ Coluna de município detectada: **municipio**")
     
     # Obtém lista de municípios únicos e ordena
     municipios = df[col_municipio].dropna().unique()
@@ -450,6 +457,8 @@ else:
 
 st.title("📝 Atualização de Dados")
 st.caption(f"Consulte pelo aniversário ou nome | Município: {municipio_selecionado}")
+
+# ... (o resto do código continua igual a partir daqui)
 
 # Normaliza datas da coluna DN para tipo date
 def to_date_safe(v):
