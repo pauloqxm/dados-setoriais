@@ -89,9 +89,7 @@ FORM_HEADER = [
 
 def clean_value(value):
     """Limpa valores para serem compatíveis com JSON/Sheets"""
-    if value is None:
-        return ""
-    elif isinstance(value, float) and math.isnan(value):
+    if value is None or pd.isna(value) or str(value).strip() in ['', 'nan', 'NaN']:
         return ""
     elif isinstance(value, (int, float)):
         # Remove .0 de números inteiros
@@ -100,7 +98,7 @@ def clean_value(value):
         else:
             return str(value)
     else:
-        return str(value)
+        return str(value).strip()
 
 def salvar_em_planilha(dados_formulario: dict) -> bool:
     """
@@ -463,12 +461,22 @@ escolha = st.selectbox("Selecione o filiado (se houver homônimos na mesma data)
 selecionado = matches[matches[col_nome] == escolha].iloc[0]
 
 st.markdown("### 📄 Dados do cadastro")
-# Substituindo o container por um selectbox style
-dados_cadastro = f"""
-Nome: {selecionado.get(col_nome, '')}
-E-mail: {selecionado.get(col_email, '')}
-Celular/WhatsApp: {format_phone_br(str(selecionado.get(col_whats, '')))}
-"""
+
+# Função para formatar os valores e substituir NaN/vazios
+def formatar_valor(valor):
+    if valor is None or pd.isna(valor) or str(valor).strip() in ['', 'nan', 'NaN']:
+        return "Sem informação (atualize)"
+    return str(valor).strip()
+
+# Obtém e formata os valores
+nome_formatado = formatar_valor(selecionado.get(col_nome, ""))
+email_formatado = formatar_valor(selecionado.get(col_email, ""))
+telefone_raw = selecionado.get(col_whats, "")
+telefone_formatado = formatar_valor(telefone_raw)
+
+# Se não for "Sem informação", formata o telefone
+if telefone_formatado != "Sem informação (atualize)":
+    telefone_formatado = format_phone_br(telefone_formatado)
 
 # Criando um faux selectbox para exibir os dados
 st.markdown(
@@ -485,9 +493,9 @@ st.markdown(
     ">
     <div style="font-weight: 600; color: #6B7280; font-size: 0.9rem; margin-bottom: 8px;">Dados do cadastro atual</div>
     <div style="line-height: 1.5;">
-        <strong>Nome:</strong> {selecionado.get(col_nome, '')}<br>
-        <strong>E-mail:</strong> {selecionado.get(col_email, '')}<br>
-        <strong>Celular/WhatsApp:</strong> {format_phone_br(str(selecionado.get(col_whats, '')))}
+        <strong>Nome:</strong> {nome_formatado}<br>
+        <strong>E-mail:</strong> {email_formatado}<br>
+        <strong>Celular/WhatsApp:</strong> {telefone_formatado}
     </div>
     </div>
     """, 
