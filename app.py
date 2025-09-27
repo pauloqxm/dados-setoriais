@@ -344,8 +344,8 @@ with st.container():
     )
     st.markdown('</div>', unsafe_allow_html=True)
 
-st.title("🗂️ Atualização de Contatos de Filiados")
-st.caption("Consulte pelo aniversário e, se necessário, envie correções de contato para a planilha oficial.")
+st.title("🗂️ Atualização de Dados")
+st.caption("Consulte pelo aniversário e, se não encontrar, pesquise pelo nome.")
 
 # ============ Entrada de dados base ============
 @st.cache_data(show_spinner=False)
@@ -606,7 +606,7 @@ setorial = st.selectbox("Selecione um setorial", ["Cultura", "Agrário"])
 # ============ Envio para Google Sheets ============
 st.divider()
 st.markdown('<div class="section-title">📤 Enviar atualização</div>', unsafe_allow_html=True)
-st.caption("As respostas serão anexadas à planilha indicada, com cabeçalho na primeira linha se ainda não existir.")
+st.caption("As respostas serão enviadas para o diretório municipal, e serão atualizadas no sistema.")
 
 with st.form("envio_form"):
     submitted = st.form_submit_button("Enviar atualização")
