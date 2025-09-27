@@ -6,6 +6,7 @@ import pandas as pd
 import streamlit as st
 from datetime import datetime, date
 from typing import Optional, List
+import math
 
 # =========================
 # Google Sheets connection
@@ -86,6 +87,21 @@ FORM_HEADER = [
     "setorial",
 ]
 
+def clean_value(value):
+    """Limpa valores para serem compatíveis com JSON/Sheets"""
+    if value is None:
+        return ""
+    elif isinstance(value, float) and math.isnan(value):
+        return ""
+    elif isinstance(value, (int, float)):
+        # Remove .0 de números inteiros
+        if value == int(value):
+            return str(int(value))
+        else:
+            return str(value)
+    else:
+        return str(value)
+
 def salvar_em_planilha(dados_formulario: dict) -> bool:
     """
     Salva os dados do formulário em uma planilha do Google Sheets:
@@ -112,20 +128,25 @@ def salvar_em_planilha(dados_formulario: dict) -> bool:
         if not existing:
             ws.append_row(FORM_HEADER, value_input_option="USER_ENTERED")
 
+        # Limpa todos os valores antes de enviar
+        cleaned_payload = {}
+        for key, value in dados_formulario.items():
+            cleaned_payload[key] = clean_value(value)
+        
         # Remove .0 do final do telefone atual e novo
         for campo in ['celular_whatsapp_atual', 'novo_celular_whatsapp']:
-            if campo in dados_formulario:
-                valor = str(dados_formulario[campo])
+            if campo in cleaned_payload:
+                valor = str(cleaned_payload[campo])
                 if valor.endswith('.0'):
-                    dados_formulario[campo] = valor[:-2]
+                    cleaned_payload[campo] = valor[:-2]
                 elif '.' in valor and valor.replace('.', '').isdigit():
                     # Se for número decimal, converte para inteiro
                     try:
-                        dados_formulario[campo] = str(int(float(valor)))
+                        cleaned_payload[campo] = str(int(float(valor)))
                     except:
                         pass
 
-        row = [dados_formulario.get(k, "") for k in FORM_HEADER]
+        row = [cleaned_payload.get(k, "") for k in FORM_HEADER]
         ws.append_row(row, value_input_option="USER_ENTERED")
         return True
 
@@ -483,8 +504,8 @@ st.caption("As respostas serão anexadas à planilha indicada, com cabeçalho na
 with st.form("envio_form"):
     submitted = st.form_submit_button("Enviar atualização")
     if submitted:
-        # Remove .0 do telefone atual
-        telefone_atual = str(selecionado.get(col_whats, ""))
+        # Remove .0 do telefone atual e trata NaN
+        telefone_atual = clean_value(selecionado.get(col_whats, ""))
         if telefone_atual.endswith('.0'):
             telefone_atual = telefone_atual[:-2]
         
@@ -496,13 +517,13 @@ with st.form("envio_form"):
         payload = {
             "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
             "data_nascimento": dob.strftime("%d/%m/%Y"),
-            "nome_do_filiado": selecionado.get(col_nome, ""),
-            "email_atual": selecionado.get(col_email, ""),
+            "nome_do_filiado": clean_value(selecionado.get(col_nome, "")),
+            "email_atual": clean_value(selecionado.get(col_email, "")),
             "celular_whatsapp_atual": telefone_atual,
             "corrigir_telefone_whatsapp": "Sim" if opt_fone else "Não",
             "novo_celular_whatsapp": novo_fone_digits,
             "corrigir_email": "Sim" if opt_mail else "Não",
-            "novo_email": (novo_mail or ""),
+            "novo_email": clean_value(novo_mail or ""),
             "setorial": setorial,
         }
 
