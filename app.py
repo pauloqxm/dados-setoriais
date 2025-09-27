@@ -1,4 +1,3 @@
-
 import os
 import io
 import json
@@ -11,7 +10,6 @@ from typing import Optional, List
 # =========================
 # Google Sheets connection
 # =========================
-
 def get_gspread_client():
     """
     Tenta autenticar com gspread usando, nesta ordem:
@@ -67,7 +65,6 @@ def get_gspread_client():
     return client
 
 # ============ Configurações iniciais ============
-
 st.set_page_config(page_title="Atualização de Contatos — Filiados", page_icon="🗂️", layout="centered")
 
 st.markdown(
@@ -93,7 +90,6 @@ st.title("🗂️ Atualização de Contatos de Filiados")
 st.caption("Consulte pelo **aniversário** e, se necessário, envie correções de contato para a planilha oficial.")
 
 # ============ Entrada de dados base ============
-
 @st.cache_data(show_spinner=False)
 def load_csv(path_or_buffer) -> pd.DataFrame:
     # Tenta detectar separador automaticamente
@@ -122,7 +118,7 @@ csv_source = None
 for candidate in CSV_CANDIDATES:
     if os.path.exists(candidate):
         csv_source = candidate
-        st.success(f"Arquivo base encontrado: **{candidate}**")
+        # (Mensagem removida a pedido)
         break
 
 if not csv_source:
@@ -166,7 +162,7 @@ if missing_cols:
 
 # Normaliza datas da coluna DN para tipo date
 def to_date_safe(v):
-    if pd.isna(v): 
+    if pd.isna(v):
         return None
     # Tenta vários formatos comuns
     for fmt in ("%d/%m/%Y", "%Y-%m-%d", "%d-%m-%Y", "%d/%m/%y"):
@@ -183,10 +179,16 @@ def to_date_safe(v):
 df["_dn_date"] = df[col_dn].apply(to_date_safe)
 
 # ============ Formulário de consulta ============
-
 st.subheader("🔎 Consulta por data de nascimento")
 
-dob = st.date_input("Data de nascimento", format="DD/MM/YYYY", value=None)
+# Libera datas antigas e evita erro de faixa:
+dob = st.date_input(
+    "Data de nascimento",
+    format="DD/MM/YYYY",
+    value=None,
+    min_value=date(1900, 1, 1),
+    max_value=date.today(),
+)
 if dob is None:
     st.stop()
 
@@ -211,7 +213,6 @@ with st.container(border=True):
 st.divider()
 
 # ============ Correções ============
-
 st.subheader("✍️ Correções de contato (opcional)")
 
 colA, colB = st.columns(2)
@@ -234,7 +235,6 @@ st.subheader("🏷️ Setorial")
 setorial = st.selectbox("Selecione um setorial", ["Cultura", "Agrário"])
 
 # ============ Envio para Google Sheets ============
-
 st.divider()
 st.markdown("### 📤 Enviar atualização")
 st.caption("As respostas serão **anexadas** à planilha indicada, com cabeçalho na primeira linha se ainda não existir.")
