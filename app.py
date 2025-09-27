@@ -419,37 +419,56 @@ if missing_cols:
     )
     st.stop()
 
-# ============ FILTRO DE MUNICÍPIO ============
+# ============ FILTRO DE MUNICÍPIO (com normalização) ============
 st.markdown('<div class="section-title">🏙️ Filtro por Município</div>', unsafe_allow_html=True)
 
+def _norm_txt(x: str) -> str:
+    import unicodedata, re
+    if x is None:
+        return ""
+    s = str(x).strip()
+    # remove acentos
+    s = ''.join(c for c in unicodedata.normalize('NFKD', s) if not unicodedata.combining(c))
+    s = s.lower()
+    s = re.sub(r'\s+', ' ', s)
+    return s
+
 if col_municipio:
-    st.success(f"✅ Coluna de município detectada: **municipio**")
-    
-    # Obtém lista de municípios únicos e ordena
-    municipios = df[col_municipio].dropna().unique()
-    municipios = sorted([str(m).strip() for m in municipios if str(m).strip() != ""])
-    
-    if len(municipios) == 0:
-        st.warning("Nenhum município encontrado na base de dados.")
+    st.success(f"✅ Coluna de município detectada: **{col_municipio}**")
+
+    # Série original como string limpa (para evitar NaN e números)
+    serie_mun = df[col_municipio].astype(str).map(lambda v: v.strip()).replace({"nan": ""})
+
+    # Mapa normalizado -> exemplo original (o primeiro encontrado)
+    norm_to_original = {}
+    for val in serie_mun:
+        if not val:
+            continue
+        key = _norm_txt(val)
+        if key and key not in norm_to_original:
+            norm_to_original[key] = val
+
+    # Opções ordenadas por forma original (casefold para ordenação estável)
+    opcoes_originais = sorted(norm_to_original.values(), key=lambda s: s.casefold())
+    opcoes_select = ["Todos os municípios"] + opcoes_originais
+
+    municipio_escolhido_display = st.selectbox(
+        "Selecione o município para filtrar a pesquisa:",
+        options=opcoes_select,
+        index=0
+    )
+
+    if municipio_escolhido_display == "Todos os municípios":
         df_filtrado = df.copy()
-        municipio_selecionado = "Nenhum município encontrado"
+        municipio_selecionado = "Todos os municípios"
     else:
-        # Adiciona opção "Todos os municípios"
-        municipios_com_todos = ["Todos os municípios"] + municipios
-        
-        municipio_selecionado = st.selectbox(
-            "Selecione o município para filtrar a pesquisa:",
-            options=municipios_com_todos,
-            index=0  # Seleciona "Todos os municípios" por padrão
-        )
-        
-        # Aplica filtro se não for "Todos os municípios"
-        if municipio_selecionado == "Todos os municípios":
-            df_filtrado = df.copy()
-        else:
-            df_filtrado = df[df[col_municipio] == municipio_selecionado].copy()
-            
-        st.info(f"**Município selecionado:** {municipio_selecionado} | **Registros encontrados:** {len(df_filtrado)}")
+        # Normaliza seleção e filtra por equivalência normalizada
+        alvo_norm = _norm_txt(municipio_escolhido_display)
+        mask = serie_mun.map(_norm_txt).eq(alvo_norm)
+        df_filtrado = df[mask].copy()
+        municipio_selecionado = municipio_escolhido_display
+
+    st.info(f"**Município selecionado:** {municipio_selecionado} | **Registros encontrados:** {len(df_filtrado)}")
 else:
     st.warning("Coluna de município não encontrada na base de dados. Mostrando todos os registros.")
     df_filtrado = df.copy()
@@ -457,6 +476,7 @@ else:
 
 st.title("📝 Atualização de Dados")
 st.caption(f"Consulte pelo aniversário ou nome | Município: {municipio_selecionado}")
+
 
 # ... (o resto do código continua igual a partir daqui)
 
