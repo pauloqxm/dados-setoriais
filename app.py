@@ -1,26 +1,63 @@
 
 import os
 import io
+import json
+import re
 import pandas as pd
 import streamlit as st
 from datetime import datetime, date
 from typing import Optional, List
 
-# === Optional: Google Sheets (gspread) ===
-# We'll try to import gspread only when needed
+# =========================
+# Google Sheets connection
+# =========================
+
 def get_gspread_client():
+    """
+    Tenta autenticar com gspread usando, nesta ordem:
+    1) st.secrets["gcp_service_account"]
+    2) arquivo local "service_account.json"
+    3) variável de ambiente GOOGLE_APPLICATION_CREDENTIALS
+    """
     try:
         import gspread
         from google.oauth2.service_account import Credentials
-    except Exception as e:
+    except Exception:
         st.error("Bibliotecas do Google não estão instaladas. Adicione 'gspread' e 'google-auth' ao requirements.txt.")
         return None
 
-    if "gcp_service_account" not in st.secrets:
-        st.error("As credenciais do Google não foram configuradas. Adicione st.secrets['gcp_service_account'].")
+    creds_info = None
+
+    # 1) st.secrets
+    if "gcp_service_account" in st.secrets:
+        creds_info = st.secrets["gcp_service_account"]
+    else:
+        # 2) arquivo local
+        sa_path = "service_account.json"
+        if os.path.exists(sa_path):
+            try:
+                with open(sa_path, "r", encoding="utf-8") as f:
+                    creds_info = json.load(f)
+            except Exception as e:
+                st.warning(f"Não consegui ler service_account.json: {e}")
+        # 3) variável de ambiente
+        if creds_info is None and os.environ.get("GOOGLE_APPLICATION_CREDENTIALS"):
+            env_path = os.environ["GOOGLE_APPLICATION_CREDENTIALS"]
+            if os.path.exists(env_path):
+                try:
+                    with open(env_path, "r", encoding="utf-8") as f:
+                        creds_info = json.load(f)
+                except Exception as e:
+                    st.warning(f"Não consegui ler credenciais de {env_path}: {e}")
+
+    if not creds_info:
+        st.error(
+            "As credenciais do Google não foram configuradas.\n"
+            "Use st.secrets['gcp_service_account'] **ou** um arquivo local service_account.json "
+            "**ou** a variável de ambiente GOOGLE_APPLICATION_CREDENTIALS apontando para o JSON."
+        )
         return None
 
-    creds_info = st.secrets["gcp_service_account"]
     scope = [
         "https://www.googleapis.com/auth/spreadsheets",
         "https://www.googleapis.com/auth/drive",
@@ -59,6 +96,7 @@ st.caption("Consulte pelo **aniversário** e, se necessário, envie correções 
 
 @st.cache_data(show_spinner=False)
 def load_csv(path_or_buffer) -> pd.DataFrame:
+    # Tenta detectar separador automaticamente
     df = pd.read_csv(path_or_buffer, sep=None, engine="python")
     # Normaliza nomes de colunas (sem acentos/caixa e troca espaços por sublinhado)
     def norm(s: str) -> str:
@@ -70,14 +108,24 @@ def load_csv(path_or_buffer) -> pd.DataFrame:
     df.columns = [norm(c) for c in df.columns]
     return df
 
-DEFAULT_CSV_PATH = "FILADOSDADOS.csv"
-csv_source = None
+# Aceita múltiplos nomes/variações do arquivo
+CSV_CANDIDATES = [
+    "FILIADOSDADOS.CSV",
+    "FILIADOSDADOS.csv",
+    "FILADOSDADOS.CSV",
+    "FILADOSDADOS.csv",
+    "filiaDOSdados.csv",
+    "filiaDOSdados.CSV",
+]
 
-# Tenta usar arquivo local se existir, senão aceita upload
-if os.path.exists(DEFAULT_CSV_PATH):
-    csv_source = DEFAULT_CSV_PATH
-    st.success("Arquivo base encontrado: **FILADOSDADOS.csv**")
-else:
+csv_source = None
+for candidate in CSV_CANDIDATES:
+    if os.path.exists(candidate):
+        csv_source = candidate
+        st.success(f"Arquivo base encontrado: **{candidate}**")
+        break
+
+if not csv_source:
     up = st.file_uploader("Envie a planilha .csv (separadores automáticos).", type=["csv"])
     if up:
         csv_source = io.BytesIO(up.read())
@@ -191,20 +239,23 @@ st.divider()
 st.markdown("### 📤 Enviar atualização")
 st.caption("As respostas serão **anexadas** à planilha indicada, com cabeçalho na primeira linha se ainda não existir.")
 
-sheet_url = st.text_input(
-    "URL da Planilha Google (aba onde deseja registrar as respostas):",
-    value="https://docs.google.com/spreadsheets/d/1tWyQQow2jhP50hSLSc00CvzfWVubpcd48MUeVvWTa_s/edit?gid=0",
-)
+# URL pré-configurada (pode ser alterada dentro de um expander avançado)
+SHEET_URL_DEFAULT = "https://docs.google.com/spreadsheets/d/1tWyQQow2jhP50hSLSc00CvzfWVubpcd48MUeVvWTa_s/edit?gid=0"
+sheet_url = SHEET_URL_DEFAULT
 
-def gsheet_append_row(payload: dict) -> bool:
+with st.expander("Opções avançadas (alterar planilha de destino)"):
+    sheet_url = st.text_input(
+        "URL da Planilha Google (aba onde deseja registrar as respostas):",
+        value=SHEET_URL_DEFAULT,
+    )
+
+def gsheet_append_row(payload: dict, sheet_url: str) -> bool:
     # Retorna True se sucesso, False se falhar
     client = get_gspread_client()
     if client is None:
         return False
 
     try:
-        # Extrai IDs da URL
-        import re
         # Encontrar o spreadsheetId
         m = re.search(r"/spreadsheets/d/([a-zA-Z0-9-_]+)", sheet_url)
         if not m:
@@ -243,10 +294,6 @@ def gsheet_append_row(payload: dict) -> bool:
         existing = ws.get_all_values()
         if not existing:
             ws.append_row(header, value_input_option="USER_ENTERED")
-        else:
-            # Se a primeira linha não parecer cabeçalho correto, não sobrescrevemos,
-            # apenas continuamos a preencher nas linhas seguintes.
-            pass
 
         # Ordena payload conforme header
         row = [payload.get(k, "") for k in header]
@@ -272,7 +319,7 @@ with st.form("envio_form"):
             "setorial": setorial,
         }
 
-        ok = gsheet_append_row(payload)
+        ok = gsheet_append_row(payload, sheet_url)
         if ok:
             st.success("✅ Envio realizado com sucesso!")
             st.json(payload)
