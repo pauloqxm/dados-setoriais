@@ -595,7 +595,7 @@ novo_fone = None
 novo_mail = None
 
 if opt_fone:
-    novo_fone = st.text_input("Novo Telefone/WhatsApp", placeholder="88977776666")
+    novo_fone = st.text_input("Novo Telefone/WhatsApp", placeholder="Ex. 88977776666")
 
 if opt_mail:
     novo_mail = st.text_input("Novo E-mail", placeholder="exemplo@dominio.com")
