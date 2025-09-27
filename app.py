@@ -112,6 +112,19 @@ def salvar_em_planilha(dados_formulario: dict) -> bool:
         if not existing:
             ws.append_row(FORM_HEADER, value_input_option="USER_ENTERED")
 
+        # Remove .0 do final do telefone atual e novo
+        for campo in ['celular_whatsapp_atual', 'novo_celular_whatsapp']:
+            if campo in dados_formulario:
+                valor = str(dados_formulario[campo])
+                if valor.endswith('.0'):
+                    dados_formulario[campo] = valor[:-2]
+                elif '.' in valor and valor.replace('.', '').isdigit():
+                    # Se for número decimal, converte para inteiro
+                    try:
+                        dados_formulario[campo] = str(int(float(valor)))
+                    except:
+                        pass
+
         row = [dados_formulario.get(k, "") for k in FORM_HEADER]
         ws.append_row(row, value_input_option="USER_ENTERED")
         return True
@@ -131,37 +144,64 @@ st.markdown(
     :root {
         --pt-red: #C00000;
         --pt-red-dark: #8F0000;
-        --pt-red-soft: #FDE8E8;
+        --pt-red-light: #FF4B4B;
+        --pt-red-soft: #FFF5F5;
         --text: #1F2937;
         --muted: #6B7280;
         --card: #ffffff;
-        --border: #f1f1f1;
+        --border: #E5E7EB;
+        --shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
     }
+    
+    .main {
+        background: linear-gradient(135deg, #FFF5F5 0%, #FFFFFF 50%, #FFF0F0 100%);
+    }
+    
+    .stApp {
+        background: linear-gradient(135deg, #FFF5F5 0%, #FFFFFF 50%, #FFF0F0 100%);
+    }
+    
     .app-topbar {
-        border-radius: 12px;
+        border-radius: 16px;
         overflow: hidden;
-        box-shadow: 0 8px 24px rgba(0,0,0,.08);
-        border: 1px solid var(--border);
+        box-shadow: var(--shadow);
+        border: 2px solid var(--pt-red-soft);
+        margin-bottom: 2rem;
+        background: white;
     }
+    
     .desc {
         margin-top: .5rem;
-        font-weight: 600;
+        font-weight: 700;
         color: var(--pt-red-dark);
-        background: linear-gradient(180deg, #fff, #fff 55%, #fff0 100%);
+        background: linear-gradient(90deg, var(--pt-red-soft), #ffffff, var(--pt-red-soft));
         text-align: center;
-        padding: 8px 10px;
+        padding: 12px 20px;
+        font-size: 1.1rem;
+        border-top: 2px solid var(--pt-red-soft);
     }
+    
     .small { font-size: 0.9rem; color: var(--muted); }
     .ok { color: #065f46; }
     .warn { color: #92400e; }
     .err { color: #991b1b; }
 
     .card {
-        border-radius: 14px;
-        padding: 14px 16px;
-        box-shadow: 0 6px 16px rgba(0,0,0,.06);
-        background: var(--card);
-        border: 1px solid var(--border);
+        border-radius: 16px;
+        padding: 20px;
+        box-shadow: var(--shadow);
+        background: white;
+        border: 2px solid var(--pt-red-soft);
+        margin: 1rem 0;
+    }
+    
+    .section-title {
+        color: var(--pt-red-dark);
+        font-weight: 700;
+        font-size: 1.4rem;
+        margin-bottom: 1rem;
+        padding-bottom: 0.5rem;
+        border-bottom: 2px solid var(--pt-red-soft);
     }
 
     /* Botão principal */
@@ -170,27 +210,84 @@ st.markdown(
         color: #fff;
         border: none;
         border-radius: 12px;
-        padding: 10px 16px;
+        padding: 12px 24px;
         font-weight: 700;
-        box-shadow: 0 4px 12px rgba(192,0,0,.25);
+        font-size: 1.1rem;
+        box-shadow: var(--shadow);
+        transition: all 0.3s ease;
+        width: 100%;
     }
+    
     div.stButton > button:hover {
-        filter: brightness(1.05);
-        transform: translateY(-1px);
+        background: linear-gradient(135deg, var(--pt-red-light), var(--pt-red));
+        transform: translateY(-2px);
+        box-shadow: 0 8px 15px rgba(192, 0, 0, 0.3);
     }
 
     /* Inputs */
-    .stTextInput input, .stSelectbox, .stDateInput input {
-        border-radius: 10px !important;
-        border-color: #f0d3d3 !important;
+    .stTextInput input, .stSelectbox select, .stDateInput input {
+        border-radius: 12px !important;
+        border: 2px solid #f0d3d3 !important;
+        padding: 12px !important;
+        font-size: 1rem !important;
     }
-    .stTextInput input:focus, .stDateInput input:focus {
-        outline: 2px solid var(--pt-red) !important;
+    
+    .stTextInput input:focus, .stSelectbox select:focus, .stDateInput input:focus {
+        outline: none !important;
         border-color: var(--pt-red) !important;
+        box-shadow: 0 0 0 3px rgba(192, 0, 0, 0.1) !important;
+    }
+    
+    /* Checkbox */
+    .stCheckbox label {
+        font-weight: 600;
+        color: var(--pt-red-dark);
+    }
+    
+    /* Success message */
+    .success-box {
+        background: linear-gradient(135deg, #F0FFF4, #C6F6D5);
+        border: 2px solid #48BB78;
+        border-radius: 16px;
+        padding: 2rem;
+        text-align: center;
+        margin: 2rem 0;
+        box-shadow: var(--shadow);
+    }
+    
+    .success-icon {
+        font-size: 3rem;
+        margin-bottom: 1rem;
     }
 
     /* Divider color trick */
-    hr { border-color: #f5caca !important; }
+    hr { 
+        border-color: #f5caca !important;
+        margin: 2rem 0;
+        height: 3px;
+        background: linear-gradient(90deg, transparent, var(--pt-red-soft), transparent);
+        border: none;
+    }
+    
+    /* Labels */
+    .stMarkdown h3 {
+        color: var(--pt-red-dark) !important;
+        font-weight: 700 !important;
+    }
+    
+    .stMarkdown h2 {
+        color: var(--pt-red-dark) !important;
+        font-weight: 700 !important;
+        border-left: 4px solid var(--pt-red);
+        padding-left: 1rem;
+        margin-top: 2rem;
+    }
+    
+    .stMarkdown h1 {
+        color: var(--pt-red-dark) !important;
+        text-align: center;
+        margin-bottom: 1rem;
+    }
     </style>
     """,
     unsafe_allow_html=True,
@@ -241,7 +338,6 @@ csv_source = None
 for candidate in CSV_CANDIDATES:
     if os.path.exists(candidate):
         csv_source = candidate
-        # mensagem removida a pedido
         break
 
 if not csv_source:
@@ -305,16 +401,22 @@ def only_digits(s: str) -> str:
 
 def format_phone_br(s: str) -> str:
     digits = only_digits(str(s))
+    if digits.endswith('.0'):
+        digits = digits[:-2]
     if len(digits) < 3:  # sem DDD não formatar
         return digits
     ddd = digits[:2]
     resto = digits[2:]
+    if len(resto) == 8:
+        resto = f"{resto[:4]}-{resto[4:]}"
+    elif len(resto) == 9:
+        resto = f"{resto[:5]}-{resto[5:]}"
     return f"({ddd}) {resto}"
 
 df["_dn_date"] = df[col_dn].apply(to_date_safe)
 
 # ============ Formulário de consulta ============
-st.subheader("🔎 Consulta por data de nascimento")
+st.markdown('<div class="section-title">🔎 Consulta por data de nascimento</div>', unsafe_allow_html=True)
 
 # Libera datas antigas e evita erro de faixa:
 dob = st.date_input(
@@ -352,7 +454,7 @@ with st.container():
 st.divider()
 
 # ============ Correções ============
-st.subheader("✍️ Correções de contato (opcional)")
+st.markdown('<div class="section-title">✍️ Correções de contato (opcional)</div>', unsafe_allow_html=True)
 
 colA, colB = st.columns(2)
 with colA:
@@ -370,26 +472,33 @@ if opt_mail:
     novo_mail = st.text_input("Novo E-mail", placeholder="exemplo@dominio.com")
 
 # ============ Setorial ============
-st.subheader("🏷️ Setorial")
+st.markdown('<div class="section-title">🏷️ Setorial</div>', unsafe_allow_html=True)
 setorial = st.selectbox("Selecione um setorial", ["Cultura", "Agrário"])
 
 # ============ Envio para Google Sheets ============
 st.divider()
-st.markdown("### 📤 Enviar atualização")
+st.markdown('<div class="section-title">📤 Enviar atualização</div>', unsafe_allow_html=True)
 st.caption("As respostas serão anexadas à planilha indicada, com cabeçalho na primeira linha se ainda não existir.")
 
 with st.form("envio_form"):
     submitted = st.form_submit_button("Enviar atualização")
     if submitted:
-        # Se o usuário digitou novo telefone, salvar somente os dígitos:
+        # Remove .0 do telefone atual
+        telefone_atual = str(selecionado.get(col_whats, ""))
+        if telefone_atual.endswith('.0'):
+            telefone_atual = telefone_atual[:-2]
+        
+        # Se o usuário digitou novo telefone, salvar somente os dígitos e remover .0
         novo_fone_digits = only_digits(novo_fone) if novo_fone else ""
+        if novo_fone_digits.endswith('.0'):
+            novo_fone_digits = novo_fone_digits[:-2]
 
         payload = {
             "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
             "data_nascimento": dob.strftime("%d/%m/%Y"),
             "nome_do_filiado": selecionado.get(col_nome, ""),
             "email_atual": selecionado.get(col_email, ""),
-            "celular_whatsapp_atual": str(selecionado.get(col_whats, "")),
+            "celular_whatsapp_atual": telefone_atual,
             "corrigir_telefone_whatsapp": "Sim" if opt_fone else "Não",
             "novo_celular_whatsapp": novo_fone_digits,
             "corrigir_email": "Sim" if opt_mail else "Não",
@@ -399,8 +508,14 @@ with st.form("envio_form"):
 
         ok = salvar_em_planilha(payload)
         if ok:
-            st.success("✅ Envio realizado com sucesso!")
-            st.json(payload)
-            st.info("Dica: compartilhe a planilha com o e-mail do **Service Account** usado nas credenciais.")
+            st.markdown(
+                """
+                <div class="success-box">
+                    <div class="success-icon">✅</div>
+                    <h3>Envio realizado com sucesso!</h3>
+                </div>
+                """, 
+                unsafe_allow_html=True
+            )
         else:
             st.error("Não foi possível enviar para a planilha. Verifique as credenciais e dependências.")
