@@ -388,38 +388,47 @@ with st.spinner("Carregando a base..."):
     df = load_csv(csv_source)
 
 # ======== Colunas esperadas + utilitários ========
-CANDS_DN = ["data_de_nascimento","data_nascimento","data_nasc","nascimento","dt_nasc","dt_nascimento"]
-CANDS_NOME = ["nome_do_filiado","nome","nome_completo"]
-CANDS_EMAIL = ["e-mail","email","e_mail"]
-CANDS_WHATS = ["celular_whatsapp","celular","telefone","telefone_whatsapp","whatsapp"]
-CANDS_MUNICIPIO = ["municipio", "municipio_de_residencia", "cidade"]
+CANDS_DN = ["data_de_nascimento", "data_nascimento", "data_nasc", "nascimento", "dt_nasc", "dt_nascimento"]
+CANDS_NOME = ["nome_do_filiado", "nome", "nome_completo"]
+CANDS_EMAIL = ["e-mail", "email", "e_mail"]
+CANDS_WHATS = ["celular_whatsapp", "celular", "telefone", "telefone_whatsapp", "whatsapp"]
+# agora incluindo possíveis variações no plural e com acento
+CANDS_MUNICIPIO = ["municipio", "município", "municipios", "municípios", "municipio_de_residencia", "cidade", "localidade", "cidade_residencia"]
+CANDS_CPF = ["cpf"]
 
 def first_col(df, options: List[str]) -> Optional[str]:
-    for c in options:
-        if c in df.columns:
-            return c
+    for c in df.columns:
+        norm_c = c.lower().strip()
+        for opt in options:
+            if norm_c == opt.lower():
+                return c
     return None
 
-# AGORA o df já está definido, então podemos usar aqui
 col_dn = first_col(df, CANDS_DN)
 col_nome = first_col(df, CANDS_NOME)
 col_email = first_col(df, CANDS_EMAIL)
 col_whats = first_col(df, CANDS_WHATS)
 col_municipio = first_col(df, CANDS_MUNICIPIO)
+col_cpf = first_col(df, CANDS_CPF)
 
-# Verificação das colunas essenciais
-missing = [("Data de Nascimento", col_dn), ("Nome", col_nome), ("E-mail", col_email), ("Celular/WhatsApp", col_whats)]
+missing = [
+    ("Data de Nascimento", col_dn),
+    ("Nome", col_nome),
+    ("E-mail", col_email),
+    ("Celular/WhatsApp", col_whats),
+    ("Município", col_municipio),
+    ("CPF", col_cpf),
+]
 missing_cols = [label for label, val in missing if val is None]
 if missing_cols:
     st.error(
         "As seguintes colunas não foram encontradas automaticamente na planilha: "
         + ", ".join([f"**{m}**" for m in missing_cols])
-        + ".\n\n"
-        "Renomeie as colunas ou ajuste os nomes candidatos no código."
+        + ".\n\nVerifique os cabeçalhos do CSV ou ajuste as listas CANDS_* acima."
     )
     st.stop()
 
-# ============ FILTRO DE MUNICÍPIO (com normalização) ============
+# ============ FILTRO DE MUNICÍPIO ============
 st.markdown('<div class="section-title">🏙️ Filtro por Município</div>', unsafe_allow_html=True)
 
 def _norm_txt(x: str) -> str:
@@ -427,8 +436,7 @@ def _norm_txt(x: str) -> str:
     if x is None:
         return ""
     s = str(x).strip()
-    # remove acentos
-    s = ''.join(c for c in unicodedata.normalize('NFKD', s) if not unicodedata.combining(c))
+    s = ''.join(c for c in unicodedata.normalize('NFKD', s) if not unicodedata.combining(c))  # tira acentos
     s = s.lower()
     s = re.sub(r'\s+', ' ', s)
     return s
@@ -436,10 +444,8 @@ def _norm_txt(x: str) -> str:
 if col_municipio:
     st.success(f"✅ Coluna de município detectada: **{col_municipio}**")
 
-    # Série original como string limpa (para evitar NaN e números)
     serie_mun = df[col_municipio].astype(str).map(lambda v: v.strip()).replace({"nan": ""})
 
-    # Mapa normalizado -> exemplo original (o primeiro encontrado)
     norm_to_original = {}
     for val in serie_mun:
         if not val:
@@ -448,7 +454,6 @@ if col_municipio:
         if key and key not in norm_to_original:
             norm_to_original[key] = val
 
-    # Opções ordenadas por forma original (casefold para ordenação estável)
     opcoes_originais = sorted(norm_to_original.values(), key=lambda s: s.casefold())
     opcoes_select = ["Todos os municípios"] + opcoes_originais
 
@@ -462,7 +467,6 @@ if col_municipio:
         df_filtrado = df.copy()
         municipio_selecionado = "Todos os municípios"
     else:
-        # Normaliza seleção e filtra por equivalência normalizada
         alvo_norm = _norm_txt(municipio_escolhido_display)
         mask = serie_mun.map(_norm_txt).eq(alvo_norm)
         df_filtrado = df[mask].copy()
@@ -470,12 +474,13 @@ if col_municipio:
 
     st.info(f"**Município selecionado:** {municipio_selecionado} | **Registros encontrados:** {len(df_filtrado)}")
 else:
-    st.warning("Coluna de município não encontrada na base de dados. Mostrando todos os registros.")
+    st.warning("⚠️ Nenhuma coluna de município foi encontrada na base. Mostrando todos os registros.")
     df_filtrado = df.copy()
     municipio_selecionado = "Todos os municípios"
 
 st.title("📝 Atualização de Dados")
 st.caption(f"Consulte pelo aniversário ou nome | Município: {municipio_selecionado}")
+
 
 
 # ... (o resto do código continua igual a partir daqui)
