@@ -339,7 +339,7 @@ with st.container():
         use_container_width=True,
     )
     st.markdown(
-        '<div class="desc"><div style="font-size: 1.3rem; font-weight: 800; margin-bottom: 5px;">PT QUIXERAMOBIM</div>Atualize os seus dados cadastrais e participe das instâncias internas do PT</div>',
+        '<div class="desc"><div style="font-size: 1.3rem; font-weight: 800; margin-bottom: 5px;">PT QUIXERAMOBIM</div>Atualize os seus dados cadastrais e fortaleça a democracia interna do PT</div>',
         unsafe_allow_html=True,
     )
     
