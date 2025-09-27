@@ -61,8 +61,65 @@ def get_gspread_client():
         "https://www.googleapis.com/auth/drive",
     ]
     credentials = Credentials.from_service_account_info(creds_info, scopes=scope)
+
+    import gspread  # garante disponível aqui também
     client = gspread.authorize(credentials)
     return client
+
+
+# =========================
+# Config da Planilha-Alvo
+# =========================
+SPREADSHEET_ID = "1tWyQQow2jhP50hSLSc00CvzfWVubpcd48MUeVvWTa_s"
+WORKSHEET_NAME = "Página1"
+
+FORM_HEADER = [
+    "timestamp",
+    "data_nascimento",
+    "nome_do_filiado",
+    "email_atual",
+    "celular_whatsapp_atual",
+    "corrigir_telefone_whatsapp",
+    "novo_celular_whatsapp",
+    "corrigir_email",
+    "novo_email",
+    "setorial",
+]
+
+def salvar_em_planilha(dados_formulario: dict) -> bool:
+    """
+    Salva os dados do formulário em uma planilha do Google Sheets:
+    - Abre por ID (SPREADSHEET_ID).
+    - Usa/Cria a aba WORKSHEET_NAME.
+    - Garante cabeçalho FORM_HEADER se estiver vazia.
+    - Anexa a linha na ordem do FORM_HEADER.
+    """
+    try:
+        client = get_gspread_client()
+        if client is None:
+            return False
+
+        import gspread
+        sh = client.open_by_key(SPREADSHEET_ID)
+
+        # Tenta abrir a aba; se não existir, cria
+        try:
+            ws = sh.worksheet(WORKSHEET_NAME)
+        except gspread.WorksheetNotFound:
+            ws = sh.add_worksheet(title=WORKSHEET_NAME, rows=1000, cols=max(len(FORM_HEADER), 10))
+
+        existing = ws.get_all_values()
+        if not existing:
+            ws.append_row(FORM_HEADER, value_input_option="USER_ENTERED")
+
+        row = [dados_formulario.get(k, "") for k in FORM_HEADER]
+        ws.append_row(row, value_input_option="USER_ENTERED")
+        return True
+
+    except Exception as e:
+        st.error(f"Erro ao salvar na planilha: {e}")
+        return False
+
 
 # ============ Configurações iniciais ============
 st.set_page_config(page_title="Atualização de Contatos — Filiados", page_icon="🗂️", layout="centered")
@@ -144,7 +201,7 @@ with st.container():
     st.markdown('<div class="app-topbar">', unsafe_allow_html=True)
     st.image(
         "https://pt.org.br/wp-content/uploads/2025/09/whatsapp-image-2025-09-09-at-162545.jpeg",
-        use_container_width=True,  # atualizado
+        use_container_width=True,
     )
     st.markdown(
         '<div class="desc">Atualize os seus dados cadastrais e participe das instâncias internas do PT</div>',
@@ -321,70 +378,6 @@ st.divider()
 st.markdown("### 📤 Enviar atualização")
 st.caption("As respostas serão anexadas à planilha indicada, com cabeçalho na primeira linha se ainda não existir.")
 
-# URL pré-configurada (pode ser alterada dentro de um expander avançado)
-SHEET_URL_DEFAULT = "https://docs.google.com/spreadsheets/d/1tWyQQow2jhP50hSLSc00CvzfWVubpcd48MUeVvWTa_s/edit?gid=0"
-sheet_url = SHEET_URL_DEFAULT
-
-with st.expander("Opções avançadas (alterar planilha de destino)"):
-    sheet_url = st.text_input(
-        "URL da Planilha Google (aba onde deseja registrar as respostas):",
-        value=SHEET_URL_DEFAULT,
-    )
-
-def gsheet_append_row(payload: dict, sheet_url: str) -> bool:
-    # Retorna True se sucesso, False se falhar
-    client = get_gspread_client()
-    if client is None:
-        return False
-
-    try:
-        # Encontrar o spreadsheetId
-        m = re.search(r"/spreadsheets/d/([a-zA-Z0-9-_]+)", sheet_url)
-        if not m:
-            st.error("Não consegui extrair o ID da planilha. Verifique a URL.")
-            return False
-        spreadsheet_id = m.group(1)
-
-        sh = client.open_by_key(spreadsheet_id)
-        # Tenta descobrir a aba pela 'gid' na URL
-        gid_match = re.search(r"[?&]gid=(\d+)", sheet_url)
-        ws = None
-        if gid_match:
-            target_gid = int(gid_match.group(1))
-            for w in sh.worksheets():
-                if w.id == target_gid:
-                    ws = w
-                    break
-        if ws is None:
-            # fallback: primeira aba
-            ws = sh.sheet1
-
-        # Garante cabeçalho
-        header = [
-            "timestamp",
-            "data_nascimento",
-            "nome_do_filiado",
-            "email_atual",
-            "celular_whatsapp_atual",
-            "corrigir_telefone_whatsapp",
-            "novo_celular_whatsapp",
-            "corrigir_email",
-            "novo_email",
-            "setorial",
-        ]
-
-        existing = ws.get_all_values()
-        if not existing:
-            ws.append_row(header, value_input_option="USER_ENTERED")
-
-        # Ordena payload conforme header
-        row = [payload.get(k, "") for k in header]
-        ws.append_row(row, value_input_option="USER_ENTERED")
-        return True
-    except Exception as e:
-        st.error(f"Falha ao enviar para Google Sheets: {e}")
-        return False
-
 with st.form("envio_form"):
     submitted = st.form_submit_button("Enviar atualização")
     if submitted:
@@ -404,7 +397,7 @@ with st.form("envio_form"):
             "setorial": setorial,
         }
 
-        ok = gsheet_append_row(payload, sheet_url)
+        ok = salvar_em_planilha(payload)
         if ok:
             st.success("✅ Envio realizado com sucesso!")
             st.json(payload)
