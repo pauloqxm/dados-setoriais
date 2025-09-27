@@ -144,7 +144,7 @@ with st.container():
     st.markdown('<div class="app-topbar">', unsafe_allow_html=True)
     st.image(
         "https://pt.org.br/wp-content/uploads/2025/09/whatsapp-image-2025-09-09-at-162545.jpeg",
-        use_column_width=True,
+        use_container_width=True,  # atualizado
     )
     st.markdown(
         '<div class="desc">Atualize os seus dados cadastrais e participe das instâncias internas do PT</div>',
@@ -184,7 +184,7 @@ csv_source = None
 for candidate in CSV_CANDIDATES:
     if os.path.exists(candidate):
         csv_source = candidate
-        # (Mensagem de "Arquivo base encontrado" removida a pedido)
+        # mensagem removida a pedido
         break
 
 if not csv_source:
@@ -388,7 +388,7 @@ def gsheet_append_row(payload: dict, sheet_url: str) -> bool:
 with st.form("envio_form"):
     submitted = st.form_submit_button("Enviar atualização")
     if submitted:
-        # Se o usuário digitou novo telefone, opcionalmente salvar somente os dígitos:
+        # Se o usuário digitou novo telefone, salvar somente os dígitos:
         novo_fone_digits = only_digits(novo_fone) if novo_fone else ""
 
         payload = {
