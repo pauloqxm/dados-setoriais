@@ -335,7 +335,7 @@ st.markdown(
 with st.container():
     st.markdown('<div class="app-topbar">', unsafe_allow_html=True)
     st.image(
-        "https://pt.org.br/wp-content/uploads/2025/09/whatsapp-image-2025-09-09-at-162545.jpeg",
+        "https://i.ibb.co/RpVyNRyd/pt-setorial.jpg",
         use_container_width=True,
     )
     st.markdown(
