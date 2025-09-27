@@ -392,7 +392,7 @@ CANDS_DN = ["data_de_nascimento","data_nascimento","data_nasc","nascimento","dt_
 CANDS_NOME = ["nome_do_filiado","nome","nome_completo"]
 CANDS_EMAIL = ["e-mail","email","e_mail"]
 CANDS_WHATS = ["celular_whatsapp","celular","telefone","telefone_whatsapp","whatsapp"]
-CANDS_MUNICIPIO = ["municipio", "municipio", "municipio_de_residencia", "cidade", "município"]  # Corrigido
+CANDS_MUNICIPIO = ["municipio", "municipio", "municipio_de_residencia", "cidade", "município"]
 
 def first_col(df, options: List[str]) -> Optional[str]:
     for c in options:
@@ -406,9 +406,23 @@ col_email = first_col(df, CANDS_EMAIL)
 col_whats = first_col(df, CANDS_WHATS)
 col_municipio = first_col(df, CANDS_MUNICIPIO)
 
-# DEBUG: Mostrar colunas disponíveis para ajudar na detecção
+# DEBUG: Mostrar colunas disponíveis para confirmar
 st.write("🔍 **Colunas disponíveis na base de dados:**")
 st.write(list(df.columns))
+
+# Verifica se encontrou a coluna de município
+if col_municipio is None:
+    # Busca direta pela coluna original
+    if "município" in df.columns:
+        col_municipio = "município"
+    elif "municipio" in df.columns:
+        col_municipio = "municipio"
+    else:
+        # Tenta encontrar por similaridade
+        for col in df.columns:
+            if 'munic' in col.lower():
+                col_municipio = col
+                break
 
 missing = [("Data de Nascimento", col_dn), ("Nome", col_nome), ("E-mail", col_email), ("Celular/WhatsApp", col_whats)]
 missing_cols = [label for label, val in missing if val is None]
@@ -424,22 +438,9 @@ if missing_cols:
 # ============ FILTRO DE MUNICÍPIO ============
 st.markdown('<div class="section-title">🏙️ Filtro por Município</div>', unsafe_allow_html=True)
 
-# Verifica se a coluna de município existe com mais opções
-if col_municipio is None:
-    # Tenta encontrar a coluna por correspondência parcial
-    municipio_cols = [col for col in df.columns if any(word in col.lower() for word in ['munic', 'cidade', 'city'])]
-    
-    if municipio_cols:
-        col_municipio = municipio_cols[0]
-        st.info(f"📋 Coluna de município detectada: **{col_municipio}**")
-    else:
-        st.warning("⚠️ Coluna de município não encontrada na base de dados. Mostrando todos os registros.")
-        df_filtrado = df.copy()
-        municipio_selecionado = "Todos os municípios"
-else:
-    st.success(f"✅ Coluna de município detectada: **{col_municipio}**")
-
 if col_municipio:
+    st.success(f"✅ Coluna de município detectada: **{col_municipio}**")
+    
     # Obtém lista de municípios únicos e ordena
     municipios = df[col_municipio].dropna().unique()
     municipios = sorted([str(m).strip() for m in municipios if str(m).strip() != ""])
@@ -465,6 +466,10 @@ if col_municipio:
             df_filtrado = df[df[col_municipio] == municipio_selecionado].copy()
             
         st.info(f"**Município selecionado:** {municipio_selecionado} | **Registros encontrados:** {len(df_filtrado)}")
+else:
+    st.warning("Coluna de município não encontrada na base de dados. Mostrando todos os registros.")
+    df_filtrado = df.copy()
+    municipio_selecionado = "Todos os municípios"
 
 st.title("📝 Atualização de Dados")
 st.caption(f"Consulte pelo aniversário ou nome | Município: {municipio_selecionado}")
