@@ -463,14 +463,36 @@ escolha = st.selectbox("Selecione o filiado (se houver homônimos na mesma data)
 selecionado = matches[matches[col_nome] == escolha].iloc[0]
 
 st.markdown("### 📄 Dados do cadastro")
-with st.container():
-    st.markdown('<div class="card">', unsafe_allow_html=True)
-    st.write("**Nome do filiado:**", selecionado.get(col_nome, ""))
-    st.write("**E-mail:**", selecionado.get(col_email, ""))
-    # Aplica a formatação no display do telefone/WhatsApp
-    raw_phone = selecionado.get(col_whats, "")
-    st.write("**Celular/WhatsApp:**", format_phone_br(str(raw_phone)))
-    st.markdown('</div>', unsafe_allow_html=True)
+# Substituindo o container por um selectbox style
+dados_cadastro = f"""
+Nome: {selecionado.get(col_nome, '')}
+E-mail: {selecionado.get(col_email, '')}
+Celular/WhatsApp: {format_phone_br(str(selecionado.get(col_whats, '')))}
+"""
+
+# Criando um faux selectbox para exibir os dados
+st.markdown(
+    f"""
+    <div style="
+        border: 1px solid #f0d3d3;
+        border-radius: 12px;
+        padding: 12px;
+        background-color: white;
+        font-size: 1rem;
+        color: #1F2937;
+        margin-bottom: 1rem;
+        box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+    ">
+    <div style="font-weight: 600; color: #6B7280; font-size: 0.9rem; margin-bottom: 8px;">Dados do cadastro atual</div>
+    <div style="line-height: 1.5;">
+        <strong>Nome:</strong> {selecionado.get(col_nome, '')}<br>
+        <strong>E-mail:</strong> {selecionado.get(col_email, '')}<br>
+        <strong>Celular/WhatsApp:</strong> {format_phone_br(str(selecionado.get(col_whats, '')))}
+    </div>
+    </div>
+    """, 
+    unsafe_allow_html=True
+)
 
 st.divider()
 
