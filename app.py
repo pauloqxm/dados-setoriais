@@ -243,6 +243,25 @@ st.markdown(
         box-shadow: 0 8px 15px rgba(192, 0, 0, 0.3);
     }
 
+    /* Botões secundários */
+    .secondary-button {
+        background: linear-gradient(135deg, #6B7280, #4B5563) !important;
+        color: #fff !important;
+        border: none !important;
+        border-radius: 12px !important;
+        padding: 10px 20px !important;
+        font-weight: 600 !important;
+        font-size: 1rem !important;
+        box-shadow: var(--shadow) !important;
+        transition: all 0.3s ease !important;
+    }
+    
+    .secondary-button:hover {
+        background: linear-gradient(135deg, #4B5563, #374151) !important;
+        transform: translateY(-1px) !important;
+        box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2) !important;
+    }
+
     /* Inputs */
     .stTextInput input, .stSelectbox select, .stDateInput input {
         border-radius: 12px !important;
@@ -435,38 +454,88 @@ def format_phone_br(s: str) -> str:
 df["_dn_date"] = df[col_dn].apply(to_date_safe)
 
 # ============ Formulário de consulta ============
-st.markdown('<div class="section-title">🔎 Consulta por data de nascimento</div>', unsafe_allow_html=True)
+st.markdown('<div class="section-title">🔎 Consulta</div>', unsafe_allow_html=True)
 
-# Libera datas antigas e evita erro de faixa:
-dob = st.date_input(
-    "Data de nascimento",
-    format="DD/MM/YYYY",
-    value=None,
-    min_value=date(1900, 1, 1),
-    max_value=date.today(),
+# Seleção do tipo de consulta
+tipo_consulta = st.radio(
+    "Selecione o tipo de consulta:",
+    ["Consulta por data de nascimento", "Consulta por nome (opcional)"],
+    horizontal=True
 )
-if dob is None:
-    st.stop()
 
-# Busca registros desta data
-matches = df[df["_dn_date"] == dob].copy()
+selecionado = None
+matches = pd.DataFrame()
 
+if tipo_consulta == "Consulta por data de nascimento":
+    # Libera datas antigas e evita erro de faixa:
+    dob = st.date_input(
+        "Data de nascimento",
+        format="DD/MM/YYYY",
+        value=None,
+        min_value=date(1900, 1, 1),
+        max_value=date.today(),
+    )
+    
+    if dob is not None:
+        # Busca registros desta data
+        matches = df[df["_dn_date"] == dob].copy()
+
+else:  # Consulta por nome
+    nome_busca = st.text_input(
+        "Digite o nome (ou parte do nome) do filiado:",
+        placeholder="Ex: Maria, João Silva, etc."
+    )
+    
+    if nome_busca and len(nome_busca.strip()) >= 2:
+        # Busca por parte do nome (case insensitive)
+        nome_busca_clean = nome_busca.strip().lower()
+        mask = df[col_nome].str.lower().str.contains(nome_busca_clean, na=False)
+        matches = df[mask].copy()
+        
+        if len(matches) > 100:
+            st.warning(f"Foram encontrados {len(matches)} registros. Digite mais letras para refinar a busca.")
+            matches = matches.head(100)  # Limita a 100 resultados
+    elif nome_busca and len(nome_busca.strip()) < 2:
+        st.info("Digite pelo menos 2 caracteres para realizar a busca.")
+
+# Processamento dos resultados da busca
 if matches.empty:
-    st.info("Nenhum registro encontrado para esta data. Verifique a data ou a planilha.")
+    if (tipo_consulta == "Consulta por data de nascimento" and dob is not None) or \
+       (tipo_consulta == "Consulta por nome (opcional)" and nome_busca and len(nome_busca.strip()) >= 2):
+        st.info("Nenhum registro encontrado. Verifique os dados ou tente outra busca.")
     st.stop()
 
 # Se houver mais de um, permite escolher pelo nome
-opcoes = matches[col_nome].fillna("(sem nome)").tolist()
-escolha = st.selectbox("Selecione o filiado (se houver homônimos na mesma data):", options=opcoes)
-selecionado = matches[matches[col_nome] == escolha].iloc[0]
-
-st.markdown("### 📄 Dados do cadastro")
+if len(matches) > 1:
+    # Ordena por nome para facilitar a busca
+    matches = matches.sort_values(by=col_nome)
+    
+    # Cria opções com nome e data de nascimento para diferenciar homônimos
+    opcoes = []
+    for _, row in matches.iterrows():
+        nome = row.get(col_nome, '(sem nome)')
+        data_nasc = row.get('_dn_date', '')
+        if data_nasc:
+            opcoes.append(f"{nome} ({data_nasc.strftime('%d/%m/%Y')})")
+        else:
+            opcoes.append(f"{nome} (data não informada)")
+    
+    escolha = st.selectbox("Selecione o filiado:", options=opcoes)
+    
+    # Extrai o nome da escolha (remove a data entre parênteses)
+    nome_escolhido = escolha.split(' (')[0]
+    selecionado = matches[matches[col_nome] == nome_escolhido].iloc[0]
+else:
+    selecionado = matches.iloc[0]
+    st.success(f"✅ Encontrado 1 registro")
 
 # Função para formatar os valores e substituir NaN/vazios
 def formatar_valor(valor):
     if valor is None or pd.isna(valor) or str(valor).strip() in ['', 'nan', 'NaN']:
         return "Sem informação (atualize)"
     return str(valor).strip()
+
+st.markdown("### 📄 Dados do cadastro")
 
 # Obtém e formata os valores
 nome_formatado = formatar_valor(selecionado.get(col_nome, ""))
@@ -477,6 +546,13 @@ telefone_formatado = formatar_valor(telefone_raw)
 # Se não for "Sem informação", formata o telefone
 if telefone_formatado != "Sem informação (atualize)":
     telefone_formatado = format_phone_br(telefone_formatado)
+
+# Formata a data de nascimento para exibição
+data_nascimento = selecionado.get('_dn_date', '')
+if data_nascimento:
+    data_nascimento_formatada = data_nascimento.strftime('%d/%m/%Y')
+else:
+    data_nascimento_formatada = "Sem informação"
 
 # Criando um faux selectbox para exibir os dados
 st.markdown(
@@ -494,6 +570,7 @@ st.markdown(
     <div style="font-weight: 600; color: #6B7280; font-size: 0.9rem; margin-bottom: 8px;">Dados do cadastro atual</div>
     <div style="line-height: 1.5;">
         <strong>Nome:</strong> {nome_formatado}<br>
+        <strong>Data de Nascimento:</strong> {data_nascimento_formatada}<br>
         <strong>E-mail:</strong> {email_formatado}<br>
         <strong>Celular/WhatsApp:</strong> {telefone_formatado}
     </div>
@@ -546,7 +623,7 @@ with st.form("envio_form"):
 
         payload = {
             "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-            "data_nascimento": dob.strftime("%d/%m/%Y"),
+            "data_nascimento": data_nascimento_formatada if data_nascimento else "",
             "nome_do_filiado": clean_value(selecionado.get(col_nome, "")),
             "email_atual": clean_value(selecionado.get(col_email, "")),
             "celular_whatsapp_atual": telefone_atual,
