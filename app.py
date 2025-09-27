@@ -344,7 +344,7 @@ with st.container():
     )
     st.markdown('</div>', unsafe_allow_html=True)
 
-st.title("🗂️ Atualização de Dados")
+st.title("📝 Atualização de Dados")
 st.caption("Consulte pelo aniversário e, se não encontrar, pesquise pelo nome.")
 
 # ============ Entrada de dados base ============
