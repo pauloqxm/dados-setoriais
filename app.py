@@ -7,13 +7,7 @@ import streamlit as st
 from datetime import datetime, date
 from typing import Optional, List
 import math
-
-# ====== Timezone (Brasília) ======
-try:
-    from zoneinfo import ZoneInfo  # Python 3.9+
-    TZ_BR = ZoneInfo("America/Sao_Paulo")
-except Exception:
-    TZ_BR = None  # fallback se precisar (poderia usar pytz)
+from zoneinfo import ZoneInfo  # <<< para horário de Brasília
 
 # =========================
 # Google Sheets connection
@@ -84,7 +78,7 @@ WORKSHEET_NAME = "Página1"
 
 FORM_HEADER = [
     "timestamp",
-    "municipio",
+    "municipio",            # município vai como 2º campo
     "data_nascimento",
     "nome_do_filiado",
     "email_atual",
@@ -136,10 +130,8 @@ def salvar_em_planilha(dados_formulario: dict) -> bool:
             ws.append_row(FORM_HEADER, value_input_option="USER_ENTERED")
 
         # Limpa todos os valores antes de enviar
-        cleaned_payload = {}
-        for key, value in dados_formulario.items():
-            cleaned_payload[key] = clean_value(value)
-        
+        cleaned_payload = {key: clean_value(value) for key, value in dados_formulario.items()}
+
         # Remove .0 do final do telefone atual e novo
         for campo in ['celular_whatsapp_atual', 'novo_celular_whatsapp']:
             if campo in cleaned_payload:
@@ -147,7 +139,6 @@ def salvar_em_planilha(dados_formulario: dict) -> bool:
                 if valor.endswith('.0'):
                     cleaned_payload[campo] = valor[:-2]
                 elif '.' in valor and valor.replace('.', '').isdigit():
-                    # Se for número decimal, converte para inteiro
                     try:
                         cleaned_payload[campo] = str(int(float(valor)))
                     except:
@@ -180,29 +171,92 @@ st.markdown(
         --border: #E5E7EB;
         --shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
     }
-    .main { background: linear-gradient(135deg, #FFF5F5 0%, #FFFFFF 50%, #FFF0F0 100%); }
-    .stApp { background: linear-gradient(135deg, #FFF5F5 0%, #FFFFFF 50%, #FFF0F0 100%); }
-    .app-topbar { border-radius: 16px; overflow: hidden; box-shadow: var(--shadow); border: 2px solid var(--pt-red-soft); margin-bottom: 2rem; background: white; }
-    .desc { margin-top: .5rem; font-weight: 700; color: var(--pt-red-dark); background: linear-gradient(90deg, var(--pt-red-soft), #ffffff, var(--pt-red-soft)); text-align: center; padding: 12px 20px; font-size: 1.1rem; border-top: 2px solid var(--pt-red-soft); }
+    .main, .stApp {
+        background: linear-gradient(135deg, #FFF5F5 0%, #FFFFFF 50%, #FFF0F0 100%);
+    }
+    .app-topbar {
+        border-radius: 16px;
+        overflow: hidden;
+        box-shadow: var(--shadow);
+        border: 2px solid var(--pt-red-soft);
+        margin-bottom: 2rem;
+        background: white;
+    }
+    .desc {
+        margin-top: .5rem;
+        font-weight: 700;
+        color: var(--pt-red-dark);
+        background: linear-gradient(90deg, var(--pt-red-soft), #ffffff, var(--pt-red-soft));
+        text-align: center;
+        padding: 12px 20px;
+        font-size: 1.1rem;
+        border-top: 2px solid var(--pt-red-soft);
+    }
     .small { font-size: 0.9rem; color: var(--muted); }
     .ok { color: #065f46; }
     .warn { color: #92400e; }
     .err { color: #991b1b; }
-    .card { border-radius: 16px; padding: 20px; box-shadow: var(--shadow); background: white; border: 2px solid var(--pt-red-soft); margin: 1rem 0; }
-    .section-title { color: var(--pt-red-dark); font-weight: 700; font-size: 1.4rem; margin-bottom: 1rem; padding-bottom: 0.5rem; border-bottom: 2px solid var(--pt-red-soft); }
-    div.stButton > button { background: linear-gradient(135deg, var(--pt-red), var(--pt-red-dark)); color: #fff; border: none; border-radius: 12px; padding: 12px 24px; font-weight: 700; font-size: 1.1rem; box-shadow: var(--shadow); transition: all 0.3s ease; width: 100%; }
-    div.stButton > button:hover { background: linear-gradient(135deg, var(--pt-red-light), var(--pt-red)); transform: translateY(-2px); box-shadow: 0 8px 15px rgba(192,0,0,0.3); }
-    .secondary-button { background: linear-gradient(135deg, #6B7280, #4B5563) !important; color: #fff !important; border: none !important; border-radius: 12px !important; padding: 10px 20px !important; font-weight: 600 !important; font-size: 1rem !important; box-shadow: var(--shadow) !important; transition: all 0.3s ease !important; }
-    .secondary-button:hover { background: linear-gradient(135deg, #4B5563, #374151) !important; transform: translateY(-1px) !important; box-shadow: 0 4px 8px rgba(0,0,0,0.2) !important; }
-    .stTextInput input, .stSelectbox select, .stDateInput input { border-radius: 12px !important; border: 2px solid #f0d3d3 !important; padding: 12px !important; font-size: 1rem !important; }
-    .stTextInput input:focus, .stSelectbox select:focus, .stDateInput input:focus { outline: none !important; border-color: var(--pt-red) !important; box-shadow: 0 0 0 3px rgba(192,0,0,0.1) !important; }
+    .card {
+        border-radius: 16px;
+        padding: 20px;
+        box-shadow: var(--shadow);
+        background: white;
+        border: 2px solid var(--pt-red-soft);
+        margin: 1rem 0;
+    }
+    .section-title {
+        color: var(--pt-red-dark);
+        font-weight: 700;
+        font-size: 1.4rem;
+        margin-bottom: 1rem;
+        padding-bottom: 0.5rem;
+        border-bottom: 2px solid var(--pt-red-soft);
+    }
+    div.stButton > button {
+        background: linear-gradient(135deg, var(--pt-red), var(--pt-red-dark));
+        color: #fff;
+        border: none;
+        border-radius: 12px;
+        padding: 12px 24px;
+        font-weight: 700;
+        font-size: 1.1rem;
+        box-shadow: var(--shadow);
+        transition: all 0.3s ease;
+        width: 100%;
+    }
+    div.stButton > button:hover {
+        background: linear-gradient(135deg, var(--pt-red-light), var(--pt-red));
+        transform: translateY(-2px);
+        box-shadow: 0 8px 15px rgba(192, 0, 0, 0.3);
+    }
+    .secondary-button { background: linear-gradient(135deg, #6B7280, #4B5563) !important; color: #fff !important; border-radius: 12px !important; padding: 10px 20px !important; font-weight: 600 !important; }
+    .secondary-button:hover { background: linear-gradient(135deg, #4B5563, #374151) !important; transform: translateY(-1px) !important; }
+    .stTextInput input, .stSelectbox select, .stDateInput input {
+        border-radius: 12px !important;
+        border: 2px solid #f0d3d3 !important;
+        padding: 12px !important;
+        font-size: 1rem !important;
+    }
+    .stTextInput input:focus, .stSelectbox select:focus, .stDateInput input:focus {
+        outline: none !important;
+        border-color: var(--pt-red) !important;
+        box-shadow: 0 0 0 3px rgba(192, 0, 0, 0.1) !important;
+    }
     .stCheckbox label { font-weight: 600; color: var(--pt-red-dark); }
-    .success-box { background: linear-gradient(135deg, #F0FFF4, #C6F6D5); border: 2px solid #48BB78; border-radius: 16px; padding: 2rem; text-align: center; margin: 2rem 0; box-shadow: var(--shadow); }
+    .success-box {
+        background: linear-gradient(135deg, #F0FFF4, #C6F6D5);
+        border: 2px solid #48BB78;
+        border-radius: 16px;
+        padding: 2rem;
+        text-align: center;
+        margin: 2rem 0;
+        box-shadow: var(--shadow);
+    }
     .success-icon { font-size: 3rem; margin-bottom: 1rem; }
     hr { border-color: #f5caca !important; margin: 2rem 0; height: 3px; background: linear-gradient(90deg, transparent, var(--pt-red-soft), transparent); border: none; }
-    .stMarkdown h3 { color: var(--pt-red-dark) !important; font-weight: 700 !important; }
-    .stMarkdown h2 { color: var(--pt-red-dark) !important; font-weight: 700 !important; border-left: 4px solid var(--pt-red); padding-left: 1rem; margin-top: 2rem; }
-    .stMarkdown h1 { color: var(--pt-red-dark) !important; text-align: center; margin-bottom: 1rem; }
+    .stMarkdown h3, .stMarkdown h2, .stMarkdown h1 { color: var(--pt-red-dark) !important; font-weight: 700 !important; }
+    .stMarkdown h2 { border-left: 4px solid var(--pt-red); padding-left: 1rem; margin-top: 2rem; }
+    .stMarkdown h1 { text-align: center; margin-bottom: 1rem; }
     </style>
     """,
     unsafe_allow_html=True,
@@ -211,9 +265,17 @@ st.markdown(
 # ======= Barra superior (imagem) + descrição =======
 with st.container():
     st.markdown('<div class="app-topbar">', unsafe_allow_html=True)
-    st.image("https://i.ibb.co/RpVyNRyd/pt-setorial.jpg", use_container_width=True)
+    st.image(
+        "https://i.ibb.co/RpVyNRyd/pt-setorial.jpg",
+        use_container_width=True,
+    )
     st.markdown(
-        '<div class="desc"><div style="font-size: 1.3rem; font-weight: 800; margin-bottom: 5px;">PT QUIXERAMOBIM</div>Atualize os seus dados cadastrais e fortaleça a democracia interna do PT</div>',
+        """
+        <div class="desc">
+            <div style="font-size: 1.3rem; font-weight: 800; margin-bottom: 5px;">PT QUIXERAMOBIM</div>
+            Atualize os seus dados cadastrais e fortaleça a democracia interna do PT
+        </div>
+        """,
         unsafe_allow_html=True,
     )
     st.markdown('</div>', unsafe_allow_html=True)
@@ -228,10 +290,10 @@ def load_csv(path_or_buffer) -> pd.DataFrame:
     df = pd.read_csv(path_or_buffer, sep=None, engine="python")
     # Normaliza nomes de colunas (sem acentos/caixa e troca espaços por sublinhado)
     def norm(s: str) -> str:
-        import unicodedata, re
+        import unicodedata, re as _re
         s2 = ''.join(c for c in unicodedata.normalize('NFKD', s) if not unicodedata.combining(c))
         s2 = s2.lower()
-        s2 = re.sub(r'\s+', '_', s2.strip())
+        s2 = _re.sub(r'\s+', '_', s2.strip())
         return s2
     df.columns = [norm(c) for c in df.columns]
     return df
@@ -295,6 +357,11 @@ if missing_cols:
     )
     st.stop()
 
+# Municipio é obrigatório agora
+if not col_mun:
+    st.error("A coluna de município não foi encontrada automaticamente e o filtro é obrigatório. Ajuste o cabeçalho do CSV (ex.: 'MUNICÍPIO').")
+    st.stop()
+
 # Normaliza datas da coluna DN para tipo date
 def to_date_safe(v):
     if pd.isna(v):
@@ -333,21 +400,23 @@ df["_dn_date"] = df[col_dn].apply(to_date_safe)
 
 # ======== Filtro MUNICÍPIO (obrigatório) ========
 st.markdown('<div class="section-title">🏙️ Município</div>', unsafe_allow_html=True)
-if not col_mun:
-    st.error("Coluna de município não encontrada automaticamente. Ajuste o cabeçalho (ex.: 'MUNICÍPIO').")
-    st.stop()
 
 muni_series = df[col_mun].fillna("").astype(str).str.strip()
 municipios = sorted(sorted(set([m for m in muni_series if m])), key=lambda x: x.casefold())
-municipios = ["Selecione..."] + municipios
-sel_muni = st.selectbox("Selecione o município", options=municipios, index=0)
 
-# Bloqueia avanço até escolher um município válido
-if sel_muni == "Selecione...":
+# selectbox obrigatório (sem "Todos")
+sel_muni = st.selectbox(
+    "Selecione o município",
+    options=municipios,
+    index=None,
+    placeholder="Escolha um município"
+)
+
+if not sel_muni:
     st.warning("Selecione um município para continuar.")
     st.stop()
 
-# Filtra base pelo município escolhido
+# filtra base pelo município escolhido
 df_base = df[df[col_mun].astype(str).str.strip() == sel_muni].copy()
 
 # ============ Formulário de consulta ============
@@ -364,6 +433,7 @@ selecionado = None
 matches = pd.DataFrame()
 
 if tipo_consulta == "Consulta por data de nascimento":
+    # Libera datas antigas e evita erro de faixa:
     dob = st.date_input(
         "Data de nascimento",
         format="DD/MM/YYYY",
@@ -371,28 +441,33 @@ if tipo_consulta == "Consulta por data de nascimento":
         min_value=date(1900, 1, 1),
         max_value=date.today(),
     )
+    
     if dob is not None:
+        # Busca registros desta data na base filtrada
         matches = df_base[df_base["_dn_date"] == dob].copy()
+
 else:  # Consulta por nome
     nome_busca = st.text_input(
         "Digite o nome (ou parte do nome) do filiado:",
         placeholder="Ex: Maria, João Silva, etc."
     )
+    
     if nome_busca and len(nome_busca.strip()) >= 2:
         nome_busca_clean = nome_busca.strip().lower()
         mask = df_base[col_nome].str.lower().str.contains(nome_busca_clean, na=False)
         matches = df_base[mask].copy()
+        
         if len(matches) > 100:
             st.warning(f"Foram encontrados {len(matches)} registros. Digite mais letras para refinar a busca.")
-            matches = matches.head(100)
+            matches = matches.head(100)  # Limita a 100 resultados
     elif nome_busca and len(nome_busca.strip()) < 2:
         st.info("Digite pelo menos 2 caracteres para realizar a busca.")
 
 # Processamento dos resultados da busca
 if matches.empty:
     if (tipo_consulta == "Consulta por data de nascimento" and 'dob' in locals() and dob is not None) or \
-       (tipo_consulta == "Consulta por nome (opcional)" and nome_busca and len(nome_busca.strip()) >= 2):
-        st.info("Nenhum registro encontrado para o município selecionado. Verifique os dados ou tente outra busca.")
+       (tipo_consulta == "Consulta por nome (opcional)" and 'nome_busca' in locals() and nome_busca and len(nome_busca.strip()) >= 2):
+        st.info("Nenhum registro encontrado. Verifique os dados ou tente outra busca.")
     st.stop()
 
 # Se houver mais de um, permite escolher pelo nome
@@ -406,6 +481,7 @@ if len(matches) > 1:
             opcoes.append(f"{nome} ({data_nasc.strftime('%d/%m/%Y')})")
         else:
             opcoes.append(f"{nome} (data não informada)")
+    
     escolha = st.selectbox("Selecione o filiado:", options=opcoes)
     nome_escolhido = escolha.split(' (')[0]
     selecionado = matches[matches[col_nome] == nome_escolhido].iloc[0]
@@ -413,10 +489,134 @@ else:
     selecionado = matches.iloc[0]
     st.success("✅ Encontrado 1 registro")
 
-# Utilitário de exibição
+# Função para formatar os valores e substituir NaN/vazios
 def formatar_valor(valor):
     if valor is None or pd.isna(valor) or str(valor).strip() in ['', 'nan', 'NaN']:
         return "Sem informação (atualize)"
     return str(valor).strip()
 
-st.markdown("
+st.markdown("### 📄 Dados do cadastro")
+
+# Obtém e formata os valores
+nome_formatado = formatar_valor(selecionado.get(col_nome, ""))
+email_formatado = formatar_valor(selecionado.get(col_email, ""))
+telefone_raw = selecionado.get(col_whats, "")
+telefone_formatado = formatar_valor(telefone_raw)
+
+# Se não for "Sem informação", formata o telefone
+if telefone_formatado != "Sem informação (atualize)":
+    telefone_formatado = format_phone_br(telefone_formatado)
+
+# Formata a data de nascimento para exibição
+data_nascimento = selecionado.get('_dn_date', '')
+if data_nascimento:
+    data_nascimento_formatada = data_nascimento.strftime('%d/%m/%Y')
+else:
+    data_nascimento_formatada = "Sem informação"
+
+# MUNICÍPIO do registro (sempre existe, pois filtro é obrigatório)
+municipio_do_registro = sel_muni
+
+# Exibição
+st.markdown(
+    f"""
+    <div style="
+        border: 1px solid #f0d3d3;
+        border-radius: 12px;
+        padding: 12px;
+        background-color: white;
+        font-size: 1rem;
+        color: #1F2937;
+        margin-bottom: 1rem;
+        box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+    ">
+    <div style="font-weight: 600; color: #6B7280; font-size: 0.9rem; margin-bottom: 8px;">Dados do cadastro atual</div>
+    <div style="line-height: 1.5;">
+        <strong>Nome:</strong> {nome_formatado}<br>
+        <strong>Data de Nascimento:</strong> {data_nascimento_formatada}<br>
+        <strong>Município:</strong> {municipio_do_registro}<br>
+        <strong>E-mail:</strong> {email_formatado}<br>
+        <strong>Celular/WhatsApp:</strong> {telefone_formatado}
+    </div>
+    </div>
+    """,
+    unsafe_allow_html=True
+)
+
+st.divider()
+
+# ============ Correções ============
+st.markdown('<div class="section-title">✍️ Correções de contato (opcional)</div>', unsafe_allow_html=True)
+
+colA, colB = st.columns(2)
+with colA:
+    opt_fone = st.checkbox("Corrigir Telefone/WhatsApp")
+with colB:
+    opt_mail = st.checkbox("Corrigir E-mail")
+
+novo_fone = None
+novo_mail = None
+
+if opt_fone:
+    novo_fone = st.text_input("Novo Telefone/WhatsApp", placeholder="Ex. 88977776666")
+
+if opt_mail:
+    novo_mail = st.text_input("Novo E-mail", placeholder="exemplo@dominio.com")
+
+# ============ Setorial ============
+st.markdown('<div class="section-title">🏷️ Setorial</div>', unsafe_allow_html=True)
+setorial = st.selectbox("Selecione um setorial", ["Selecione", "Cultura", "Agrário", "Outro"])
+
+# ============ Envio para Google Sheets ============
+st.divider()
+st.markdown('<div class="section-title">📤 Enviar atualização</div>', unsafe_allow_html=True)
+st.caption("As respostas serão enviadas para o diretório municipal e atualizadas no sistema.")
+
+with st.form("envio_form"):
+    submitted = st.form_submit_button("Enviar atualização")
+    if submitted:
+        # Remove .0 do telefone atual e trata NaN
+        telefone_atual = clean_value(selecionado.get(col_whats, ""))
+        if telefone_atual.endswith('.0'):
+            telefone_atual = telefone_atual[:-2]
+        
+        # Se o usuário digitou novo telefone, salvar somente os dígitos e remover .0
+        def only_digits_local(x):
+            return re.sub(r"\D+", "", x or "")
+        novo_fone_digits = only_digits_local(novo_fone) if novo_fone else ""
+        if novo_fone_digits.endswith('.0'):
+            novo_fone_digits = novo_fone_digits[:-2]
+
+        # Município a enviar (do filtro obrigatório)
+        municipio_val = sel_muni
+
+        # Timestamp no horário de Brasília
+        ts_br = datetime.now(ZoneInfo("America/Sao_Paulo")).strftime("%d/%m/%Y %H:%M:%S")
+
+        payload = {
+            "timestamp": ts_br,
+            "municipio": municipio_val,
+            "data_nascimento": data_nascimento_formatada if data_nascimento else "",
+            "nome_do_filiado": clean_value(selecionado.get(col_nome, "")),
+            "email_atual": clean_value(selecionado.get(col_email, "")),
+            "celular_whatsapp_atual": telefone_atual,
+            "corrigir_telefone_whatsapp": "Sim" if opt_fone else "Não",
+            "novo_celular_whatsapp": novo_fone_digits,
+            "corrigir_email": "Sim" if opt_mail else "Não",
+            "novo_email": clean_value(novo_mail or ""),
+            "setorial": setorial,
+        }
+
+        ok = salvar_em_planilha(payload)
+        if ok:
+            st.markdown(
+                """
+                <div class="success-box">
+                    <div class="success-icon">✅</div>
+                    <h3>Envio realizado com sucesso!</h3>
+                </div>
+                """,
+                unsafe_allow_html=True
+            )
+        else:
+            st.error("Não foi possível enviar para a planilha. Verifique as credenciais e dependências.")
