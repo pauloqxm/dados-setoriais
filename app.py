@@ -272,7 +272,7 @@ with st.container():
     st.markdown(
         """
         <div class="desc">
-            <div style="font-size: 1.3rem; font-weight: 800; margin-bottom: 5px;">PT QUIXERAMOBIM</div>
+            <div style="font-size: 1.3rem; font-weight: 800; margin-bottom: 5px;">CAMPO DEMOCRÁTICO/div>
             Atualize os seus dados cadastrais e fortaleça a democracia interna do PT
         </div>
         """,
