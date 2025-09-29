@@ -76,6 +76,7 @@ WORKSHEET_NAME = "Página1"
 
 FORM_HEADER = [
     "timestamp",
+    "municipio",
     "data_nascimento",
     "nome_do_filiado",
     "email_atual",
@@ -346,7 +347,7 @@ with st.container():
     st.markdown('</div>', unsafe_allow_html=True)
 
 st.title("📝 Atualização de Dados")
-st.caption("Consulte pelo aniversário e, se não encontrar, pesquise pelo nome.")
+st.caption("Selecione o município, depois consulte pelo aniversário ou nome.")
 
 # ============ Entrada de dados base ============
 @st.cache_data(show_spinner=False)
@@ -391,6 +392,7 @@ with st.spinner("Carregando a base..."):
     df = load_csv(csv_source)
 
 # ======== Colunas esperadas + utilitários ========
+CANDS_MUNICIPIO = ["municipio", "município", "cidade", "municipio_de_residencia"]
 CANDS_DN = ["data_de_nascimento","data_nascimento","data_nasc","nascimento","dt_nasc","dt_nascimento"]
 CANDS_NOME = ["nome_do_filiado","nome","nome_completo"]
 CANDS_EMAIL = ["e-mail","email","e_mail"]
@@ -402,12 +404,13 @@ def first_col(df, options: List[str]) -> Optional[str]:
             return c
     return None
 
+col_municipio = first_col(df, CANDS_MUNICIPIO)
 col_dn = first_col(df, CANDS_DN)
 col_nome = first_col(df, CANDS_NOME)
 col_email = first_col(df, CANDS_EMAIL)
 col_whats = first_col(df, CANDS_WHATS)
 
-missing = [("Data de Nascimento", col_dn), ("Nome", col_nome), ("E-mail", col_email), ("Celular/WhatsApp", col_whats)]
+missing = [("Município", col_municipio), ("Data de Nascimento", col_dn), ("Nome", col_nome), ("E-mail", col_email), ("Celular/WhatsApp", col_whats)]
 missing_cols = [label for label, val in missing if val is None]
 if missing_cols:
     st.error(
@@ -454,8 +457,31 @@ def format_phone_br(s: str) -> str:
 
 df["_dn_date"] = df[col_dn].apply(to_date_safe)
 
+# ============ Filtro por Município ============
+st.markdown('<div class="section-title">🏙️ Filtro por Município</div>', unsafe_allow_html=True)
+
+# Obtém lista única de municípios
+municipios = sorted(df[col_municipio].dropna().unique())
+municipio_selecionado = st.selectbox(
+    "Selecione o município:",
+    options=["Todos"] + municipios,
+    index=0
+)
+
+# Filtra dados pelo município selecionado
+if municipio_selecionado != "Todos":
+    df_filtrado = df[df[col_municipio] == municipio_selecionado].copy()
+else:
+    df_filtrado = df.copy()
+
+st.info(f"📊 **{len(df_filtrado)}** filiados encontrados para {municipio_selecionado}")
+
+if df_filtrado.empty:
+    st.warning("Nenhum filiado encontrado para o município selecionado.")
+    st.stop()
+
 # ============ Formulário de consulta ============
-st.markdown('<div class="section-title">🔎 Consulta</div>', unsafe_allow_html=True)
+st.markdown('<div class="section-title">🔎 Consulta Individual</div>', unsafe_allow_html=True)
 
 # Seleção do tipo de consulta
 tipo_consulta = st.radio(
@@ -479,7 +505,7 @@ if tipo_consulta == "Consulta por data de nascimento":
     
     if dob is not None:
         # Busca registros desta data
-        matches = df[df["_dn_date"] == dob].copy()
+        matches = df_filtrado[df_filtrado["_dn_date"] == dob].copy()
 
 else:  # Consulta por nome
     nome_busca = st.text_input(
@@ -490,8 +516,8 @@ else:  # Consulta por nome
     if nome_busca and len(nome_busca.strip()) >= 2:
         # Busca por parte do nome (case insensitive)
         nome_busca_clean = nome_busca.strip().lower()
-        mask = df[col_nome].str.lower().str.contains(nome_busca_clean, na=False)
-        matches = df[mask].copy()
+        mask = df_filtrado[col_nome].str.lower().str.contains(nome_busca_clean, na=False)
+        matches = df_filtrado[mask].copy()
         
         if len(matches) > 100:
             st.warning(f"Foram encontrados {len(matches)} registros. Digite mais letras para refinar a busca.")
@@ -511,19 +537,20 @@ if len(matches) > 1:
     # Ordena por nome para facilitar a busca
     matches = matches.sort_values(by=col_nome)
     
-    # Cria opções com nome e data de nascimento para diferenciar homônimos
+    # Cria opções com nome, data de nascimento e município para diferenciar homônimos
     opcoes = []
     for _, row in matches.iterrows():
         nome = row.get(col_nome, '(sem nome)')
         data_nasc = row.get('_dn_date', '')
+        municipio = row.get(col_municipio, '')
         if data_nasc:
-            opcoes.append(f"{nome} ({data_nasc.strftime('%d/%m/%Y')})")
+            opcoes.append(f"{nome} ({data_nasc.strftime('%d/%m/%Y')}) - {municipio}")
         else:
-            opcoes.append(f"{nome} (data não informada)")
+            opcoes.append(f"{nome} (data não informada) - {municipio}")
     
     escolha = st.selectbox("Selecione o filiado:", options=opcoes)
     
-    # Extrai o nome da escolha (remove a data entre parênteses)
+    # Extrai o nome da escolha (remove a data entre parênteses e município)
     nome_escolhido = escolha.split(' (')[0]
     selecionado = matches[matches[col_nome] == nome_escolhido].iloc[0]
 else:
@@ -540,6 +567,7 @@ st.markdown("### 📄 Dados do cadastro")
 
 # Obtém e formata os valores
 nome_formatado = formatar_valor(selecionado.get(col_nome, ""))
+municipio_formatado = formatar_valor(selecionado.get(col_municipio, ""))
 email_formatado = formatar_valor(selecionado.get(col_email, ""))
 telefone_raw = selecionado.get(col_whats, "")
 telefone_formatado = formatar_valor(telefone_raw)
@@ -571,6 +599,7 @@ st.markdown(
     <div style="font-weight: 600; color: #6B7280; font-size: 0.9rem; margin-bottom: 8px;">Dados do cadastro atual</div>
     <div style="line-height: 1.5;">
         <strong>Nome:</strong> {nome_formatado}<br>
+        <strong>Município:</strong> {municipio_formatado}<br>
         <strong>Data de Nascimento:</strong> {data_nascimento_formatada}<br>
         <strong>E-mail:</strong> {email_formatado}<br>
         <strong>Celular/WhatsApp:</strong> {telefone_formatado}
@@ -624,6 +653,7 @@ with st.form("envio_form"):
 
         payload = {
             "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+            "municipio": clean_value(selecionado.get(col_municipio, "")),
             "data_nascimento": data_nascimento_formatada if data_nascimento else "",
             "nome_do_filiado": clean_value(selecionado.get(col_nome, "")),
             "email_atual": clean_value(selecionado.get(col_email, "")),
