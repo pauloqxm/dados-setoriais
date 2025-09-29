@@ -78,6 +78,7 @@ FORM_HEADER = [
     "timestamp",
     "data_nascimento",
     "nome_do_filiado",
+    "municipio",  # incluído
     "email_atual",
     "celular_whatsapp_atual",
     "corrigir_telefone_whatsapp",
@@ -335,11 +336,11 @@ st.markdown(
 with st.container():
     st.markdown('<div class="app-topbar">', unsafe_allow_html=True)
     st.image(
-        "https://i.ibb.co/kgW1JN1v/pt-setorial.jpg",
+        "https://i.ibb.co/RpVyNRyd/pt-setorial.jpg",
         use_container_width=True,
     )
     st.markdown(
-        '<div class="desc"><div style="font-size: 1.3rem; font-weight: 800; margin-bottom: 5px;">CAMPO DEMOCRÁTICO</div>Atualize os seus dados cadastrais e fortaleça a democracia interna do PT</div>',
+        '<div class="desc"><div style="font-size: 1.3rem; font-weight: 800; margin-bottom: 5px;">PT QUIXERAMOBIM</div>Atualize os seus dados cadastrais e fortaleça a democracia interna do PT</div>',
         unsafe_allow_html=True,
     )
     
@@ -371,7 +372,7 @@ CSV_CANDIDATES = [
     "FILADOSDADOS.csv",
     "filiaDOSdados.csv",
     "filiaDOSdados.CSV",
-    "/mnt/data/FILADOSDADOS.CSV",  # caso esteja no ambiente do deploy com caminho absoluto
+    "/mnt/data/FILADOSDADOS.CSV",
 ]
 
 csv_source = None
@@ -396,8 +397,8 @@ CANDS_DN = ["data_de_nascimento","data_nascimento","data_nasc","nascimento","dt_
 CANDS_NOME = ["nome_do_filiado","nome","nome_completo"]
 CANDS_EMAIL = ["e-mail","email","e_mail"]
 CANDS_WHATS = ["celular_whatsapp","celular","telefone","telefone_whatsapp","whatsapp"]
-# === NOVO: possíveis nomes para MUNICÍPIO (normalizados) ===
-CANDS_MUN = ["municipio", "municipios", "município", "municípios"]  # após normalização, acentos viram "municipio(s)"
+# possíveis nomes para MUNICÍPIO (normalizados)
+CANDS_MUN = ["municipio", "municipios", "município", "municípios"]  # acentos somem na normalização
 
 def first_col(df, options: List[str]) -> Optional[str]:
     for c in options:
@@ -409,7 +410,7 @@ col_dn = first_col(df, CANDS_DN)
 col_nome = first_col(df, CANDS_NOME)
 col_email = first_col(df, CANDS_EMAIL)
 col_whats = first_col(df, CANDS_WHATS)
-col_mun = first_col(df, CANDS_MUN)  # === NOVO
+col_mun = first_col(df, CANDS_MUN)
 
 missing = [("Data de Nascimento", col_dn), ("Nome", col_nome), ("E-mail", col_email), ("Celular/WhatsApp", col_whats)]
 missing_cols = [label for label, val in missing if val is None]
@@ -458,22 +459,20 @@ def format_phone_br(s: str) -> str:
 
 df["_dn_date"] = df[col_dn].apply(to_date_safe)
 
-# === NOVO: filtro MUNICÍPIO (primeiro filtro) ===
+# ======== Filtro MUNICÍPIO (primeiro filtro) ========
 st.markdown('<div class="section-title">🏙️ Município</div>', unsafe_allow_html=True)
 if col_mun:
-    # prepara valores limpos para exibição
     muni_series = df[col_mun].fillna("").astype(str).str.strip()
-    # remove vazios, pega únicos, ordena alfabeticamente (casefold para PT-BR simples)
     municipios = sorted(sorted(set([m for m in muni_series if m])), key=lambda x: x.casefold())
     municipios = ["Todos"] + municipios
     sel_muni = st.selectbox("Selecione o município", options=municipios, index=0)
-    # base filtrada
     if sel_muni != "Todos":
         df_base = df[df[col_mun].astype(str).str.strip() == sel_muni].copy()
     else:
         df_base = df.copy()
 else:
     st.info("Coluna de município não encontrada automaticamente. O filtro será desativado.")
+    sel_muni = "Todos"
     df_base = df.copy()
 
 # ============ Formulário de consulta ============
@@ -500,7 +499,7 @@ if tipo_consulta == "Consulta por data de nascimento":
     )
     
     if dob is not None:
-        # Busca registros desta data **na base filtrada pelo município**
+        # Busca registros desta data na base filtrada
         matches = df_base[df_base["_dn_date"] == dob].copy()
 
 else:  # Consulta por nome
@@ -510,7 +509,6 @@ else:  # Consulta por nome
     )
     
     if nome_busca and len(nome_busca.strip()) >= 2:
-        # Busca por parte do nome (case insensitive) **na base filtrada pelo município**
         nome_busca_clean = nome_busca.strip().lower()
         mask = df_base[col_nome].str.lower().str.contains(nome_busca_clean, na=False)
         matches = df_base[mask].copy()
@@ -530,10 +528,7 @@ if matches.empty:
 
 # Se houver mais de um, permite escolher pelo nome
 if len(matches) > 1:
-    # Ordena por nome para facilitar a busca
     matches = matches.sort_values(by=col_nome)
-    
-    # Cria opções com nome e data de nascimento para diferenciar homônimos
     opcoes = []
     for _, row in matches.iterrows():
         nome = row.get(col_nome, '(sem nome)')
@@ -544,13 +539,11 @@ if len(matches) > 1:
             opcoes.append(f"{nome} (data não informada)")
     
     escolha = st.selectbox("Selecione o filiado:", options=opcoes)
-    
-    # Extrai o nome da escolha (remove a data entre parênteses)
     nome_escolhido = escolha.split(' (')[0]
     selecionado = matches[matches[col_nome] == nome_escolhido].iloc[0]
 else:
     selecionado = matches.iloc[0]
-    st.success(f"✅ Encontrado 1 registro")
+    st.success("✅ Encontrado 1 registro")
 
 # Função para formatar os valores e substituir NaN/vazios
 def formatar_valor(valor):
@@ -577,7 +570,12 @@ if data_nascimento:
 else:
     data_nascimento_formatada = "Sem informação"
 
-# Criando um faux selectbox para exibir os dados
+# MUNICÍPIO do registro (pode ser vazio se a coluna não existir)
+municipio_do_registro = ""
+if col_mun:
+    municipio_do_registro = clean_value(selecionado.get(col_mun, ""))
+
+# Exibição
 st.markdown(
     f"""
     <div style="
@@ -594,6 +592,7 @@ st.markdown(
     <div style="line-height: 1.5;">
         <strong>Nome:</strong> {nome_formatado}<br>
         <strong>Data de Nascimento:</strong> {data_nascimento_formatada}<br>
+        <strong>Município:</strong> {municipio_do_registro or (sel_muni if sel_muni != "Todos" else "Sem informação")}<br>
         <strong>E-mail:</strong> {email_formatado}<br>
         <strong>Celular/WhatsApp:</strong> {telefone_formatado}
     </div>
@@ -640,14 +639,23 @@ with st.form("envio_form"):
             telefone_atual = telefone_atual[:-2]
         
         # Se o usuário digitou novo telefone, salvar somente os dígitos e remover .0
-        novo_fone_digits = only_digits(novo_fone) if novo_fone else ""
+        def only_digits_local(x):
+            return re.sub(r"\D+", "", x or "")
+        novo_fone_digits = only_digits_local(novo_fone) if novo_fone else ""
         if novo_fone_digits.endswith('.0'):
             novo_fone_digits = novo_fone_digits[:-2]
+
+        # Município a enviar (prioriza coluna do registro; se vazio, usa o selecionado no filtro)
+        if col_mun:
+            municipio_val = clean_value(selecionado.get(col_mun, "")) or clean_value(sel_muni if sel_muni != "Todos" else "")
+        else:
+            municipio_val = clean_value(sel_muni if sel_muni != "Todos" else "")
 
         payload = {
             "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
             "data_nascimento": data_nascimento_formatada if data_nascimento else "",
             "nome_do_filiado": clean_value(selecionado.get(col_nome, "")),
+            "municipio": municipio_val,  # incluído
             "email_atual": clean_value(selecionado.get(col_email, "")),
             "celular_whatsapp_atual": telefone_atual,
             "corrigir_telefone_whatsapp": "Sim" if opt_fone else "Não",
