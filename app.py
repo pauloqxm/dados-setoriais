@@ -266,7 +266,7 @@ st.markdown(
 with st.container():
     st.markdown('<div class="app-topbar">', unsafe_allow_html=True)
     st.image(
-        "https://i.ibb.co/RpVyNRyd/pt-setorial.jpg",
+        "https://i.ibb.co/RpVyNRyd/pt-.jpg",
         use_container_width=True,
     )
     st.markdown(
